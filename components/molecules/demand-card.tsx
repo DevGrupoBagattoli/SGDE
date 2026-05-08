@@ -1,6 +1,6 @@
 "use client"
 
-import { CalendarClock, Clock, MapPin, UserRound } from "lucide-react"
+import { CalendarClock, Clock, MapPin, UserRound, Users } from "lucide-react"
 
 import { StatusBadge } from "@/components/atoms/status-badge"
 import { Button } from "@/components/ui/button"
@@ -56,6 +56,20 @@ export function DemandCard({
               {demand.local}
             </p>
           </div>
+
+          {demand.participantes && demand.participantes.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Users className="size-3.5 shrink-0 text-slate-400" />
+              {demand.participantes.map((name) => (
+                <span
+                  key={name}
+                  className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-800 ring-1 ring-blue-200"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {demand.observacoes ? (
             <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">

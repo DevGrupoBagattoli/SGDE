@@ -57,6 +57,7 @@ export function CreateDemandModal({
       duracaoPrevista,
       status,
       observacoes: observacoes.trim(),
+      participantes: [],
     })
   }
 

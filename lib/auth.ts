@@ -9,3 +9,4 @@ export const roleLabels: Record<UserRole, string> = {
   gestor: "Gestor",
   eletricista: "Eletricista",
 }
+  
