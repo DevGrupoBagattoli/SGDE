@@ -128,17 +128,9 @@ export function DemandsDashboard() {
 
     if (nextSession.role === "eletricista") {
       setSelectedTechnician(nextSession.name)
-      const firstDemand = demands.find(
-        (demand) => demand.tecnico === nextSession.name
-      )
-
-      if (firstDemand) {
-        const firstDemandDate = new Date(firstDemand.horarioInicio)
-        setSelectedDate(firstDemandDate)
-        setCurrentMonth(
-          new Date(firstDemandDate.getFullYear(), firstDemandDate.getMonth(), 1)
-        )
-      }
+      const today = new Date()
+      setSelectedDate(today)
+      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
 
       return
     }
@@ -159,7 +151,11 @@ export function DemandsDashboard() {
     setScheduleError("")
   }
 
-  const handleUpdateSchedule = (event: FormEvent<HTMLFormElement>) => {
+  const handleUpdateSchedule = (
+    event: FormEvent<HTMLFormElement>,
+    participantes: string[],
+    duracaoPrevista: string
+  ) => {
     event.preventDefault()
 
     if (!editingDemand) {
@@ -184,6 +180,8 @@ export function DemandsDashboard() {
               ...demand,
               horarioInicio: nextSchedule,
               observacoes: observationValue.trim(),
+              participantes,
+              duracaoPrevista,
             }
           : demand
       )
@@ -196,48 +194,97 @@ export function DemandsDashboard() {
   }
 
   const isElectrician = session.role === "eletricista"
+  const isManager = session.role === "gestor"
   const availableTechnicians = isElectrician ? [session.name] : technicians
 
   return (
     <main className="min-h-svh bg-slate-100 text-slate-950">
       <DashboardHero
+        isManager={isManager}
         session={session}
         totalDemands={filteredDemands.length}
-        onCreateDemand={() => setIsCreateModalOpen(true)}
+        onCreateDemand={() => {
+          if (!isManager) return
+          setIsCreateModalOpen(true)
+        }}
         onLogout={handleLogout}
       />
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <DemandSummary
-          statusTotals={statusTotals}
-          totalDemands={filteredDemands.length}
-        />
-        <DemandCalendar
-          calendarDays={calendarDays}
-          currentMonth={currentMonth}
-          demandsByDate={demandsByDate}
-          isTechnicianFilterLocked={isElectrician}
-          selectedDateKey={selectedDateKey}
-          selectedTechnician={selectedTechnician}
-          technicians={availableTechnicians}
-          onChangeMonth={handleChangeMonth}
-          onChangeTechnician={setSelectedTechnician}
-          onSelectDate={setSelectedDate}
-          onSelectDemand={handleOpenScheduleEditor}
-        />
-        <DaySchedulePanel
-          demands={selectedDayDemands}
-          selectedDate={selectedDate}
-          onSelectDemand={handleOpenScheduleEditor}
-        />
-        <DemandDetailsList
-          demands={filteredDemands}
-          onEditSchedule={handleOpenScheduleEditor}
-          onUpdateStatus={handleUpdateStatus}
-        />
+        {isElectrician ? (
+          <>
+            <div className="md:hidden">
+              <DaySchedulePanel
+                demands={selectedDayDemands}
+                selectedDate={selectedDate}
+                onSelectDemand={handleOpenScheduleEditor}
+              />
+            </div>
+
+            <div className="hidden flex-col gap-6 md:flex">
+              <DemandSummary
+                statusTotals={statusTotals}
+                totalDemands={filteredDemands.length}
+              />
+              <DemandCalendar
+                calendarDays={calendarDays}
+                currentMonth={currentMonth}
+                demandsByDate={demandsByDate}
+                isTechnicianFilterLocked
+                selectedDateKey={selectedDateKey}
+                selectedTechnician={selectedTechnician}
+                technicians={availableTechnicians}
+                onChangeMonth={handleChangeMonth}
+                onChangeTechnician={setSelectedTechnician}
+                onSelectDate={setSelectedDate}
+                onSelectDemand={handleOpenScheduleEditor}
+              />
+              <DaySchedulePanel
+                demands={selectedDayDemands}
+                selectedDate={selectedDate}
+                onSelectDemand={handleOpenScheduleEditor}
+              />
+              <DemandDetailsList
+                demands={filteredDemands}
+                onEditSchedule={handleOpenScheduleEditor}
+                onUpdateStatus={handleUpdateStatus}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <DemandSummary
+              statusTotals={statusTotals}
+              totalDemands={filteredDemands.length}
+            />
+            <DemandCalendar
+              calendarDays={calendarDays}
+              currentMonth={currentMonth}
+              demandsByDate={demandsByDate}
+              selectedDateKey={selectedDateKey}
+              selectedTechnician={selectedTechnician}
+              technicians={availableTechnicians}
+              onChangeMonth={handleChangeMonth}
+              onChangeTechnician={setSelectedTechnician}
+              onSelectDate={setSelectedDate}
+              onSelectDemand={handleOpenScheduleEditor}
+            />
+            <DaySchedulePanel
+              demands={selectedDayDemands}
+              selectedDate={selectedDate}
+              onSelectDemand={handleOpenScheduleEditor}
+            />
+            <DemandDetailsList
+              demands={filteredDemands}
+              onEditSchedule={handleOpenScheduleEditor}
+              onUpdateStatus={handleUpdateStatus}
+            />
+          </>
+        )}
       </section>
 
       {editingDemand ? (
         <ScheduleEditModal
+          allTechnicians={technicianOptions}
           demand={editingDemand}
           error={scheduleError}
           observationValue={observationValue}

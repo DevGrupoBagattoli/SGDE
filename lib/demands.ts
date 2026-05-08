@@ -12,6 +12,7 @@ export type Demand = {
   horarioInicio: string
   duracaoPrevista: string
   observacoes: string
+  participantes: string[]
 }
 
 export const mockDemands: Demand[] = [
@@ -25,6 +26,7 @@ export const mockDemands: Demand[] = [
     horarioInicio: "2026-04-30T10:00:00",
     status: "Em Andamento",
     observacoes: "",
+    participantes: [],
   },
   {
     id: "2",
@@ -36,6 +38,7 @@ export const mockDemands: Demand[] = [
     horarioInicio: "2026-04-30T14:00:00",
     status: "Pendente",
     observacoes: "Aguardando chegada do material",
+    participantes: [],
   },
   {
     id: "3",
@@ -47,6 +50,7 @@ export const mockDemands: Demand[] = [
     horarioInicio: "2026-05-01T08:30:00",
     status: "Pendente",
     observacoes: "",
+    participantes: [],
   },
   {
     id: "4",
@@ -58,6 +62,7 @@ export const mockDemands: Demand[] = [
     horarioInicio: "2026-05-01T11:00:00",
     status: "Concluído",
     observacoes: "Teste final realizado com a manutenção local.",
+    participantes: [],
   },
 ]
 

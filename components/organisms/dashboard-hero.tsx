@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { UserSession, roleLabels } from "@/lib/auth"
 
 type DashboardHeroProps = {
+  isManager: boolean
   session: UserSession
   totalDemands: number
   onCreateDemand: () => void
@@ -11,6 +12,7 @@ type DashboardHeroProps = {
 }
 
 export function DashboardHero({
+  isManager,
   session,
   totalDemands,
   onCreateDemand,
@@ -38,10 +40,12 @@ export function DashboardHero({
             <CalendarDays className="size-4 text-blue-600" />
             <span>{totalDemands} demandas</span>
           </div>
-          <Button className="h-9" type="button" onClick={onCreateDemand}>
-            <Plus className="size-4" />
-            Novo chamado
-          </Button>
+          {isManager ? (
+            <Button className="h-9" type="button" onClick={onCreateDemand}>
+              <Plus className="size-4" />
+              Novo chamado
+            </Button>
+          ) : null}
           <Button
             className="h-9"
             type="button"
