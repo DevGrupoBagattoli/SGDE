@@ -99,8 +99,32 @@ type Demand = {
   horarioInicio: string   // ISO 8601
   duracaoPrevista: string // ex: "02:00h"
   observacoes: string
+  participantes: string[] // eletricistas adicionados como apoio
 }
 ```
+
+### Evolução Planejada para Multi-dia (backend)
+
+Para suporte oficial a demandas que atravessam a meia-noite ou duram mais de 24h, o modelo de backend deve evoluir para intervalo explícito:
+
+```ts
+type Demand = {
+  id: string
+  tecnico: string
+  equipe: string
+  local: string
+  descricao: string
+  status: DemandStatus
+  inicioPrevisto: string // ISO 8601
+  fimPrevisto: string    // ISO 8601, sempre maior que inicioPrevisto
+  duracaoPrevista: string
+  observacoes: string
+  participantes: string[]
+}
+```
+
+Regra técnica mínima:
+- Validar `fimPrevisto > inicioPrevisto` no backend.
 
 ---
 
@@ -127,6 +151,8 @@ Todo o estado da aplicação está centralizado no componente `DemandsDashboard`
 - `statusTotals` — contagem de demandas por status.
 - `calendarDays` — grade de 42 dias para o mês atual.
 - `demandsByDate` — demandas agrupadas por chave de data (`"YYYY-MM-DD"`).
+
+Para suporte multi-dia, `demandsByDate` deve incluir a mesma demanda em todas as chaves de data cobertas pelo intervalo entre `inicioPrevisto` e `fimPrevisto`.
 
 ---
 
@@ -156,9 +182,12 @@ Os comentários `TODO` no código marcam onde a integração com a API deve ocor
 | `demands-dashboard.tsx` (useEffect) | `GET /demandas` — carregar lista inicial. |
 | `demands-dashboard.tsx` (handleUpdateStatus) | `PATCH /demandas/:id` — atualizar status. |
 | `demands-dashboard.tsx` (handleCreateDemand) | `POST /demandas` — criar novo chamado. |
-| `demands-dashboard.tsx` (handleUpdateSchedule) | `PATCH /demandas/:id` — atualizar horário e observações. |
+| `demands-dashboard.tsx` (handleUpdateSchedule) | `PATCH /demandas/:id` — atualizar início/fim, duração, observações e participantes. |
 | `login-screen.tsx` (handleManagerLogin) | `POST /auth/login` — autenticar gestor. |
 | `login-screen.tsx` (handleTechnicianLogin) | `POST /auth/login` — autenticar eletricista. |
+
+Observação para contratos API:
+- Em respostas de listagem, retornar intervalo completo da demanda para que o frontend renderize corretamente eventos multi-dia no calendário e no painel diário.
 
 ---
 
@@ -171,6 +200,22 @@ O projeto usa o **App Router** do Next.js. Atualmente há apenas uma rota:
 | `/` | `DemandsDashboard` | Toda a aplicação está nesta rota. O "roteamento" entre login e dashboard é feito por estado interno, não por URL. |
 
 Quando o backend for integrado, considerar separar `/login` como rota própria e proteger `/` com middleware de autenticação.
+
+---
+
+## Layout por Perfil
+
+O dashboard renderiza layouts distintos dependendo do perfil logado.
+
+**Gestor** — layout único em todos os tamanhos de tela:
+- Métricas → Calendário → Painel do dia → Lista de detalhes
+- Botão "Novo chamado" visível no cabeçalho.
+
+**Eletricista** — layout responsivo:
+- **Mobile** (`< md`): exibe apenas o `DaySchedulePanel` (painel do dia atual).
+- **Desktop** (`≥ md`): exibe o layout completo — métricas, calendário, painel do dia e lista de detalhes.
+- Botão "Novo chamado" **não é exibido**.
+- Ao fazer login, o calendário abre na data de hoje (não mais na primeira demanda do técnico).
 
 ---
 

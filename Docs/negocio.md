@@ -31,10 +31,13 @@ Perfil de campo. Acessa o sistema para gerenciar seus próprios atendimentos.
 
 **O eletricista pode:**
 - Visualizar apenas as suas próprias demandas.
-- Criar novos chamados (atribuídos automaticamente a si mesmo).
 - Editar o horário de seus atendimentos (com justificativa obrigatória quando há alteração de data/hora).
+- Alterar a duração prevista de seus atendimentos.
+- Adicionar ou remover participantes (outros eletricistas) de seus atendimentos.
 - Alterar o status de seus atendimentos.
 - O filtro de técnico fica bloqueado — ele não vê demandas de outros eletricistas.
+
+> **Nota:** A criação de novos chamados é exclusiva do **Gestor**. O eletricista não possui o botão "Novo chamado".
 
 ---
 
@@ -64,10 +67,25 @@ O status pode ser alterado tanto pelo gestor quanto pelo eletricista, a qualquer
 | **Equipe** | Não | Nome da equipe à qual o técnico pertence (ex: Alpha, Beta). |
 | **Local** | Sim | Endereço, bloco, cliente ou unidade onde o serviço será realizado. |
 | **Descrição** | Sim | Detalhamento do que deve ser executado no atendimento. |
-| **Dia e Horário** | Sim | Data e hora de início prevista para o atendimento. |
+| **Início Previsto** | Sim | Data e hora de início prevista para o atendimento. |
+| **Fim Previsto** | Sim | Data e hora de término prevista para o atendimento. Pode ser em outro dia. |
 | **Duração Prevista** | Sim | Estimativa de tempo de execução (ex: `02:00h`). |
 | **Status** | Sim | Situação atual do chamado. |
 | **Observações** | Não | Campo livre para anotações. Obrigatório quando há alteração de horário. |
+| **Participantes** | Não | Lista de eletricistas adicionados à demanda como apoio. Gerenciada pelo próprio eletricista durante a execução. |
+
+---
+
+## Suporte a Demandas Multi-dia
+
+Uma demanda pode durar mais de um dia. O SGDE deve permitir, por exemplo:
+- Início em `10/05 22:00` e término em `11/05 06:00`.
+- Demandas com duração superior a 24 horas.
+
+Regras para esse cenário:
+- O backend deve validar `Fim Previsto > Início Previsto`.
+- No calendário, a mesma demanda deve aparecer em todos os dias cobertos pelo intervalo.
+- No painel diário, a demanda deve ser exibida sempre que o dia selecionado intersectar o intervalo da demanda.
 
 ---
 
@@ -75,7 +93,7 @@ O status pode ser alterado tanto pelo gestor quanto pelo eletricista, a qualquer
 
 Esta é uma das regras de negócio mais importantes do sistema:
 
-> **Toda alteração de data ou horário de uma demanda exige o preenchimento obrigatório do campo de Observações, descrevendo o motivo da mudança.**
+> **Toda alteração de início previsto e/ou fim previsto de uma demanda exige o preenchimento obrigatório do campo de Observações, descrevendo o motivo da mudança.**
 
 Se o usuário tentar salvar uma alteração de horário sem preencher a justificativa, o sistema bloqueia o salvamento e exibe uma mensagem de erro.
 
@@ -99,7 +117,7 @@ Isso garante um **histórico auditável** de todas as mudanças de agenda, visí
 9. Cria um novo chamado clicando em "Novo chamado" no cabeçalho
    → Preenche todos os campos obrigatórios e confirma
 10. Edita o horário de uma demanda clicando em "Editar horário" em qualquer card
-    → Altera a data/hora; se diferente do original, deve preencher justificativa
+   → Altera início e/ou fim; se diferente do original, deve preencher justificativa
 11. Altera o status de uma demanda diretamente pelo dropdown no card
 12. Sai do sistema clicando em "Sair"
 ```
@@ -110,13 +128,16 @@ Isso garante um **histórico auditável** de todas as mudanças de agenda, visí
 1. Acessa a tela de login
 2. Seleciona o perfil "Eletricista", escolhe seu nome na lista e informa o PIN
 3. Entra no Dashboard filtrado com apenas suas próprias demandas
-4. O calendário já abre no mês da sua primeira demanda agendada
-5. Visualiza apenas seus atendimentos no calendário e na lista
-6. Clica em um dia para ver os horários daquele dia no painel
-7. Pode criar novos chamados (já atribuídos a si mesmo automaticamente)
-8. Edita horários com justificativa obrigatória quando há alteração
-9. Atualiza o status de seus atendimentos conforme execução
-10. Sai do sistema clicando em "Sair"
+4. O calendário abre no mês atual (data de hoje)
+5. No mobile: vê diretamente o painel de horários do dia atual
+   No desktop: vê o layout completo (métricas, calendário, painel e lista)
+6. Clica em um dia do calendário para ver os horários daquele dia
+7. Ao editar um atendimento, pode:
+   - Alterar início e/ou fim previsto (com justificativa obrigatória)
+   - Alterar a duração prevista
+   - Adicionar ou remover eletricistas participantes
+8. Atualiza o status de seus atendimentos conforme execução
+9. Sai do sistema clicando em "Sair"
 ```
 
 ---
@@ -139,8 +160,8 @@ Tela central do sistema após o login. Composta por:
 |---|---|
 | **Cabeçalho (Header)** | Logo do sistema, nome e perfil do usuário logado, contador de demandas, botões de "Novo chamado" e "Sair". |
 | **Cartões de Métricas** | Exibem o total geral de demandas e a contagem por cada status (Pendente, Em Andamento, Concluído). |
-| **Calendário Central** | Visão mensal com as demandas distribuídas por dia. Permite navegar entre meses, filtrar por eletricista e selecionar um dia. |
-| **Painel de Horários do Dia** | Ao selecionar um dia no calendário, exibe os atendimentos daquele dia em formato de lista com horário de início, duração e status. |
+| **Calendário Central** | Visão mensal com as demandas distribuídas por dia. Demandas multi-dia aparecem em todos os dias do intervalo. Permite navegar entre meses, filtrar por eletricista e selecionar um dia. |
+| **Painel de Horários do Dia** | Ao selecionar um dia no calendário, exibe os atendimentos que intersectam aquele dia, com início, fim, duração e status. |
 | **Lista de Detalhes** | Lista completa de todos os atendimentos visíveis, com opção de editar horário e alterar status diretamente. |
 
 ### Modal "Criar Chamado"
@@ -149,7 +170,10 @@ Formulário completo para criação de uma nova demanda. Para eletricistas, o ca
 
 ### Modal "Editar Agenda"
 
-Formulário focado para alterar o horário de uma demanda existente. Exibe o técnico e o local como contexto. Exige justificativa no campo de observações caso o horário seja alterado.
+Formulário para atualizar os dados de execução de uma demanda existente. Exibe o técnico e o local como contexto. Permite:
+- Alterar **início previsto** e **fim previsto** (exige justificativa em observações se qualquer valor mudar).
+- Alterar a **duração prevista**.
+- **Adicionar ou remover participantes** — lista de eletricistas disponíveis (exceto o próprio responsável) para incluir como apoio na demanda.
 
 ---
 
@@ -159,8 +183,9 @@ Formulário focado para alterar o horário de uma demanda existente. Exibe o té
 |---|---|---|
 | Ver demandas de todos os técnicos | ✅ | ❌ |
 | Filtrar por técnico | ✅ | ❌ (bloqueado no próprio) |
-| Criar demanda para qualquer técnico | ✅ | ❌ (apenas para si) |
+| Criar demanda para qualquer técnico | ✅ | ❌ |
 | Editar horário de qualquer demanda | ✅ | ✅ (apenas as suas) |
 | Alterar status de qualquer demanda | ✅ | ✅ (apenas as suas) |
+| Gerenciar participantes de uma demanda | ✅ | ✅ (apenas as suas) |
 
 > **Nota:** As restrições de visibilidade são aplicadas apenas no front-end neste estágio do projeto. A implementação completa das permissões deve ser enforçada pela API backend.

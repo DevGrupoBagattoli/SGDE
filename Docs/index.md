@@ -19,6 +19,8 @@
 **Atribuição de Responsáveis:** O gestor designa o eletricista ou equipe responsável pela demanda.
  
 **Visão de Calendário Total:** Interface de auditoria que permite visualizar a agenda de todos os colaboradores simultaneamente para evitar demandas concorrentes (conflitos de horário). A interface do calendário deve ser simples, clara e direta.
+
+**Suporte a Demandas Multi-dia:** O sistema deve permitir demandas que iniciam em um dia e terminam em outro, inclusive durações superiores a 24 horas.
  
 ### C. Interface do Eletricista (Campo)
  
@@ -42,6 +44,8 @@ Para que o sistema funcione com a lógica descrita, cada Evento/Chamado deve con
 | Colaboradores | Membros adicionados pelo eletricista durante a execução |
 | Localização | Endereço ou setor do serviço |
 | Descrição | Detalhamento do que deve ser executado |
+| Início Previsto | Data e hora planejadas para início da demanda |
+| Fim Previsto | Data e hora planejadas para término da demanda |
 | Tempo Previsto | Duração estimada (ex: 02:00h) |
 | Status | Situação atual da demanda (Pendente / Em Andamento / Concluído) |
 | Histórico de Alterações | Log que registra quem alterou o horário original, quando e o motivo inserido |
