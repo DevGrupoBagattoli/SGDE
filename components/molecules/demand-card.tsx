@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 type DemandCardProps = {
   demand: Demand
   onEditSchedule: (demand: Demand) => void
-  onUpdateStatus: (id: string, status: DemandStatus) => void
+  onUpdateStatus: (id: string, status: DemandStatus) => Promise<void> | void
 }
 
 export function DemandCard({

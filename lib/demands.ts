@@ -10,9 +10,12 @@ export type Demand = {
   descricao: string
   status: DemandStatus
   horarioInicio: string
+  horarioFim: string
   duracaoPrevista: string
   observacoes: string
   participantes: string[]
+  version: number
+  dateKeys: string[]
 }
 
 export const mockDemands: Demand[] = [
@@ -24,9 +27,12 @@ export const mockDemands: Demand[] = [
     descricao: "Troca de fiação do quadro de força principal",
     duracaoPrevista: "02:00h",
     horarioInicio: "2026-04-30T10:00:00",
+    horarioFim: "2026-04-30T12:00:00",
     status: "Em Andamento",
     observacoes: "",
     participantes: [],
+    version: 1,
+    dateKeys: ["2026-04-30"],
   },
   {
     id: "2",
@@ -36,9 +42,12 @@ export const mockDemands: Demand[] = [
     descricao: "Reparo em poste de iluminação interna",
     duracaoPrevista: "01:30h",
     horarioInicio: "2026-04-30T14:00:00",
+    horarioFim: "2026-04-30T15:30:00",
     status: "Pendente",
     observacoes: "Aguardando chegada do material",
     participantes: [],
+    version: 1,
+    dateKeys: ["2026-04-30"],
   },
   {
     id: "3",
@@ -48,9 +57,12 @@ export const mockDemands: Demand[] = [
     descricao: "Inspeção preventiva de disjuntores e aterramento",
     duracaoPrevista: "03:00h",
     horarioInicio: "2026-05-01T08:30:00",
+    horarioFim: "2026-05-01T11:30:00",
     status: "Pendente",
     observacoes: "",
     participantes: [],
+    version: 1,
+    dateKeys: ["2026-05-01"],
   },
   {
     id: "4",
@@ -60,9 +72,12 @@ export const mockDemands: Demand[] = [
     descricao: "Correção de oscilação no circuito de emergência",
     duracaoPrevista: "02:30h",
     horarioInicio: "2026-05-01T11:00:00",
+    horarioFim: "2026-05-01T13:30:00",
     status: "Concluído",
     observacoes: "Teste final realizado com a manutenção local.",
     participantes: [],
+    version: 1,
+    dateKeys: ["2026-05-01"],
   },
 ]
 

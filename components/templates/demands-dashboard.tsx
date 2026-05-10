@@ -15,25 +15,62 @@ import {
   getDateKey,
   toDateTimeLocalValue,
 } from "@/lib/calendar"
+import {
+  apiCreateDemand,
+  apiGetDemands,
+  apiGetTechnicians,
+  apiLogin,
+  apiLogout,
+  apiMe,
+  apiRefresh,
+  apiUpdateSchedule,
+  apiUpdateStatus,
+} from "@/lib/api"
 import { UserSession } from "@/lib/auth"
-import { Demand, DemandStatus, mockDemands, statusLabels } from "@/lib/demands"
+import { Demand, DemandStatus, statusLabels } from "@/lib/demands"
 
 export function DemandsDashboard() {
   const [session, setSession] = useState<UserSession | null>(null)
-  const [demands, setDemands] = useState<Demand[]>(() => mockDemands)
+  const [demands, setDemands] = useState<Demand[]>([])
+  const [availableTechnicians, setAvailableTechnicians] = useState<string[]>([])
+  const [isBooting, setIsBooting] = useState(true)
+  const [globalError, setGlobalError] = useState("")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedTechnician, setSelectedTechnician] = useState("Todos")
   const [editingDemand, setEditingDemand] = useState<Demand | null>(null)
   const [scheduleValue, setScheduleValue] = useState("")
   const [observationValue, setObservationValue] = useState("")
   const [scheduleError, setScheduleError] = useState("")
+  const [requestWarning, setRequestWarning] = useState("")
   const [currentMonth, setCurrentMonth] = useState(
     () => new Date(2026, 3, 1)
   )
   const [selectedDate, setSelectedDate] = useState(() => new Date(2026, 3, 30))
 
   useEffect(() => {
-    // TODO: Integrar com API GET para carregar demandas iniciais.
+    const bootstrap = async () => {
+      try {
+        const technicians = await apiGetTechnicians()
+        setAvailableTechnicians(technicians.map((technician) => technician.name))
+      } catch {
+        setAvailableTechnicians([])
+      }
+
+      try {
+        const me = await apiMe().catch(async () => apiRefresh())
+        setSession(me)
+
+        const loadedDemands = await apiGetDemands()
+        setDemands(loadedDemands)
+      } catch {
+        setSession(null)
+        setDemands([])
+      } finally {
+        setIsBooting(false)
+      }
+    }
+
+    void bootstrap()
   }, [])
 
   const technicians = useMemo(
@@ -44,10 +81,12 @@ export function DemandsDashboard() {
     [demands]
   )
 
-  const technicianOptions = useMemo(
-    () => Array.from(new Set(demands.map((demand) => demand.tecnico))),
-    [demands]
-  )
+  const technicianOptions = useMemo(() => {
+    const fromDemands = Array.from(new Set(demands.map((demand) => demand.tecnico)))
+    const fromAuthList = availableTechnicians
+
+    return Array.from(new Set([...fromDemands, ...fromAuthList]))
+  }, [availableTechnicians, demands])
 
   const filteredDemands = useMemo(() => {
     const visibleDemands =
@@ -79,8 +118,15 @@ export function DemandsDashboard() {
 
   const demandsByDate = useMemo(() => {
     return filteredDemands.reduce<Record<string, Demand[]>>((acc, demand) => {
-      const dateKey = getDateKey(new Date(demand.horarioInicio))
-      acc[dateKey] = [...(acc[dateKey] ?? []), demand]
+      const keys =
+        demand.dateKeys && demand.dateKeys.length > 0
+          ? demand.dateKeys
+          : [getDateKey(new Date(demand.horarioInicio))]
+
+      keys.forEach((dateKey) => {
+        acc[dateKey] = [...(acc[dateKey] ?? []), demand]
+      })
+
       return acc
     }, {})
   }, [filteredDemands])
@@ -94,36 +140,79 @@ export function DemandsDashboard() {
     )
   }
 
-  const handleUpdateStatus = (id: string, status: DemandStatus) => {
-    // TODO: Integrar com API POST/PATCH.
-    setDemands((currentDemands) =>
-      currentDemands.map((demand) =>
-        demand.id === id ? { ...demand, status } : demand
+  const handleUpdateStatus = async (id: string, status: DemandStatus) => {
+    setGlobalError("")
+    setRequestWarning("")
+
+    const currentDemand = demands.find((demand) => demand.id === id)
+
+    if (!currentDemand) {
+      return
+    }
+
+    try {
+      const response = await apiUpdateStatus(id, status, currentDemand.version)
+
+      setDemands((currentDemands) =>
+        currentDemands.map((demand) =>
+          demand.id === id ? response.data.demand : demand
+        )
       )
-    )
+
+      if (response.warnings.length > 0) {
+        setRequestWarning(response.warnings[0].message)
+      }
+    } catch (error) {
+      setGlobalError(
+        error instanceof Error ? error.message : "Falha ao atualizar status"
+      )
+    }
   }
 
-  const handleCreateDemand = (newDemand: Omit<Demand, "id">) => {
-    const createdDemand: Demand = {
-      ...newDemand,
-      id: crypto.randomUUID(),
+  const handleCreateDemand = async (
+    newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">
+  ) => {
+    setGlobalError("")
+    setRequestWarning("")
+
+    try {
+      const response = await apiCreateDemand(newDemand)
+      const createdDemand = response.data.demand
+      const createdAt = new Date(createdDemand.horarioInicio)
+
+      setDemands((currentDemands) => [...currentDemands, createdDemand])
+      setSelectedDate(createdAt)
+      setCurrentMonth(new Date(createdAt.getFullYear(), createdAt.getMonth(), 1))
+
+      if (session?.role === "gestor" && selectedTechnician !== "Todos") {
+        setSelectedTechnician(createdDemand.tecnico)
+      }
+
+      if (response.warnings.length > 0) {
+        setRequestWarning(response.warnings[0].message)
+      }
+
+      setIsCreateModalOpen(false)
+    } catch (error) {
+      setGlobalError(
+        error instanceof Error ? error.message : "Falha ao criar demanda"
+      )
     }
-    const createdAt = new Date(createdDemand.horarioInicio)
-
-    // TODO: Integrar com API POST para criar chamado.
-    setDemands((currentDemands) => [...currentDemands, createdDemand])
-    setSelectedDate(createdAt)
-    setCurrentMonth(new Date(createdAt.getFullYear(), createdAt.getMonth(), 1))
-
-    if (session?.role === "gestor" && selectedTechnician !== "Todos") {
-      setSelectedTechnician(createdDemand.tecnico)
-    }
-
-    setIsCreateModalOpen(false)
   }
 
-  const handleLogin = (nextSession: UserSession) => {
+  const handleLogin = async (credentials: {
+    role: "gestor" | "eletricista"
+    name: string
+    password: string
+  }) => {
+    setGlobalError("")
+    setRequestWarning("")
+
+    const nextSession = await apiLogin(credentials)
+    const loadedDemands = await apiGetDemands()
+
     setSession(nextSession)
+    setDemands(loadedDemands)
     setEditingDemand(null)
 
     if (nextSession.role === "eletricista") {
@@ -139,7 +228,9 @@ export function DemandsDashboard() {
   }
 
   const handleLogout = () => {
+    void apiLogout().catch(() => null)
     setSession(null)
+    setDemands([])
     setSelectedTechnician("Todos")
     setEditingDemand(null)
   }
@@ -151,7 +242,7 @@ export function DemandsDashboard() {
     setScheduleError("")
   }
 
-  const handleUpdateSchedule = (
+  const handleUpdateSchedule = async (
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string
@@ -172,21 +263,41 @@ export function DemandsDashboard() {
       return
     }
 
-    // TODO: Integrar com API POST/PATCH.
-    setDemands((currentDemands) =>
-      currentDemands.map((demand) =>
-        demand.id === editingDemand.id
-          ? {
-              ...demand,
-              horarioInicio: nextSchedule,
-              observacoes: observationValue.trim(),
-              participantes,
-              duracaoPrevista,
-            }
-          : demand
+    try {
+      const response = await apiUpdateSchedule(editingDemand.id, {
+        horarioInicio: nextSchedule,
+        duracaoPrevista,
+        observacoes: observationValue.trim(),
+        participantes,
+        version: editingDemand.version,
+      })
+
+      setDemands((currentDemands) =>
+        currentDemands.map((demand) =>
+          demand.id === editingDemand.id ? response.data.demand : demand
+        )
       )
+
+      if (response.warnings.length > 0) {
+        setRequestWarning(response.warnings[0].message)
+      } else {
+        setRequestWarning("")
+      }
+
+      setEditingDemand(null)
+    } catch (error) {
+      setScheduleError(
+        error instanceof Error ? error.message : "Falha ao atualizar agenda"
+      )
+    }
+  }
+
+  if (isBooting) {
+    return (
+      <main className="grid min-h-svh place-items-center bg-slate-100 text-slate-700">
+        Carregando SGDE...
+      </main>
     )
-    setEditingDemand(null)
   }
 
   if (!session) {
@@ -195,7 +306,7 @@ export function DemandsDashboard() {
 
   const isElectrician = session.role === "eletricista"
   const isManager = session.role === "gestor"
-  const availableTechnicians = isElectrician ? [session.name] : technicians
+  const selectableTechnicians = isElectrician ? [session.name] : technicians
 
   return (
     <main className="min-h-svh bg-slate-100 text-slate-950">
@@ -210,6 +321,16 @@ export function DemandsDashboard() {
         onLogout={handleLogout}
       />
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        {globalError ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {globalError}
+          </div>
+        ) : null}
+        {requestWarning ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+            {requestWarning}
+          </div>
+        ) : null}
         {isElectrician ? (
           <>
             <div className="md:hidden">
@@ -232,7 +353,7 @@ export function DemandsDashboard() {
                 isTechnicianFilterLocked
                 selectedDateKey={selectedDateKey}
                 selectedTechnician={selectedTechnician}
-                technicians={availableTechnicians}
+                technicians={selectableTechnicians}
                 onChangeMonth={handleChangeMonth}
                 onChangeTechnician={setSelectedTechnician}
                 onSelectDate={setSelectedDate}
@@ -262,7 +383,7 @@ export function DemandsDashboard() {
               demandsByDate={demandsByDate}
               selectedDateKey={selectedDateKey}
               selectedTechnician={selectedTechnician}
-              technicians={availableTechnicians}
+              technicians={selectableTechnicians}
               onChangeMonth={handleChangeMonth}
               onChangeTechnician={setSelectedTechnician}
               onSelectDate={setSelectedDate}

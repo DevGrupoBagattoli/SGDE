@@ -19,7 +19,7 @@ type ScheduleEditModalProps = {
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string
-  ) => void
+  ) => Promise<void> | void
 }
 
 export function ScheduleEditModal({

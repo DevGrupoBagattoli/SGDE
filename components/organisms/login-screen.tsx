@@ -4,27 +4,62 @@ import { FormEvent, useState } from "react"
 import { HardHat, ShieldCheck } from "lucide-react"
 
 import { LoginRoleCard } from "@/components/molecules/login-role-card"
-import { UserSession } from "@/lib/auth"
 
 type LoginScreenProps = {
   technicians: string[]
-  onLogin: (session: UserSession) => void
+  onLogin: (credentials: {
+    role: "gestor" | "eletricista"
+    name: string
+    password: string
+  }) => Promise<void>
 }
 
 export function LoginScreen({ technicians, onLogin }: LoginScreenProps) {
   const [managerName, setManagerName] = useState("Gestor Operacional")
+  const [managerPassword, setManagerPassword] = useState("admin123")
   const [technicianName, setTechnicianName] = useState(technicians[0] ?? "")
+  const [technicianPin, setTechnicianPin] = useState("1234")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleManagerLogin = (event: FormEvent<HTMLFormElement>) => {
+  const handleManagerLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // TODO: Integrar com API POST de autenticação do gestor.
-    onLogin({ name: managerName.trim() || "Gestor", role: "gestor" })
+    setError("")
+    setIsSubmitting(true)
+
+    try {
+      await onLogin({
+        role: "gestor",
+        name: managerName.trim() || "Gestor",
+        password: managerPassword,
+      })
+    } catch (loginError) {
+      setError(
+        loginError instanceof Error ? loginError.message : "Falha no login"
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleTechnicianLogin = (event: FormEvent<HTMLFormElement>) => {
+  const handleTechnicianLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // TODO: Integrar com API POST de autenticação do eletricista.
-    onLogin({ name: technicianName, role: "eletricista" })
+    setError("")
+    setIsSubmitting(true)
+
+    try {
+      await onLogin({
+        role: "eletricista",
+        name: technicianName,
+        password: technicianPin,
+      })
+    } catch (loginError) {
+      setError(
+        loginError instanceof Error ? loginError.message : "Falha no login"
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -63,9 +98,10 @@ export function LoginScreen({ technicians, onLogin }: LoginScreenProps) {
               Senha
               <input
                 className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                defaultValue="admin123"
+                value={managerPassword}
                 required
                 type="password"
+                onChange={(event) => setManagerPassword(event.target.value)}
               />
             </label>
           </LoginRoleCard>
@@ -95,14 +131,25 @@ export function LoginScreen({ technicians, onLogin }: LoginScreenProps) {
               PIN de campo
               <input
                 className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                defaultValue="1234"
+                value={technicianPin}
                 inputMode="numeric"
                 required
                 type="password"
+                onChange={(event) => setTechnicianPin(event.target.value)}
               />
             </label>
           </LoginRoleCard>
         </div>
+
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        {isSubmitting ? (
+          <div className="text-sm font-medium text-slate-600">Autenticando...</div>
+        ) : null}
       </section>
     </main>
   )

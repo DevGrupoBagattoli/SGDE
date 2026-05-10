@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button"
 import { UserSession } from "@/lib/auth"
 import { Demand, DemandStatus, statusOptions } from "@/lib/demands"
 
-type CreateDemandInput = Omit<Demand, "id">
+type CreateDemandInput = Omit<Demand, "id" | "horarioFim" | "version" | "dateKeys">
 
 type CreateDemandModalProps = {
   currentTechnician?: string
   session: UserSession
   technicians: string[]
   onClose: () => void
-  onCreate: (demand: CreateDemandInput) => void
+  onCreate: (demand: CreateDemandInput) => Promise<void> | void
 }
 
 export function CreateDemandModal({

@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  MANAGER
+  ELECTRICIAN
+}
+
+enum DemandStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  name                String             @unique
+  role                UserRole
+  passwordHash        String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  sessions            Session[]
+  primaryDemands      Demand[]           @relation("PrimaryTechnician")
+  createdDemands      Demand[]           @relation("CreatedBy")
+  demandParticipants  DemandParticipant[]
+  audits              DemandAudit[]
+}
+
+model Session {
+  id              String   @id @default(cuid())
+  userId          String
+  accessToken     String   @unique
+  refreshToken    String   @unique
+  csrfToken       String
+  accessExpiresAt DateTime
+  refreshExpiresAt DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([accessToken])
+}
+
+model Demand {
+  id               String             @id @default(cuid())
+  technicianId     String
+  equipe           String
+  local            String
+  descricao        String
+  status           DemandStatus       @default(PENDING)
+  inicioPrevisto   DateTime
+  fimPrevisto      DateTime
+  duracaoMinutos   Int
+  observacoes      String             @default("")
+  version          Int                @default(1)
+  createdById      String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  technician       User               @relation("PrimaryTechnician", fields: [technicianId], references: [id])
+  createdBy        User               @relation("CreatedBy", fields: [createdById], references: [id])
+  participants     DemandParticipant[]
+  audits           DemandAudit[]
+
+  @@index([technicianId])
+  @@index([status])
+  @@index([inicioPrevisto, fimPrevisto])
+}
+
+model DemandParticipant {
+  demandId       String
+  userId         String
+  addedAt        DateTime @default(now())
+
+  demand Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([demandId, userId])
+  @@index([userId])
+}
+
+model DemandAudit {
+  id            String   @id @default(cuid())
+  demandId       String
+  actorUserId    String
+  action         String
+  field          String
+  previousValue  String?
+  nextValue      String?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  demand Demand @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  actor  User   @relation(fields: [actorUserId], references: [id])
+
+  @@index([demandId, createdAt])
+}
