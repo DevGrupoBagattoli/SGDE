@@ -80,7 +80,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   let parsedDate
 
   try {
-    parsedDate = parseScheduleUpdateData(demand.inicioPrevisto.toISOString(), parsed.data)
+    parsedDate = parseScheduleUpdateData(
+      demand.inicioPrevisto.toISOString(),
+      demand.fimPrevisto.toISOString(),
+      parsed.data
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : "Dados inválidos"
     return jsonError(422, "UNPROCESSABLE", `Não foi possível validar os dados de agenda: ${message}`, {

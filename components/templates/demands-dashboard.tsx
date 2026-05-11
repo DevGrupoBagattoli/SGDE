@@ -278,11 +278,17 @@ export function DemandsDashboard() {
     }
 
     const nextSchedule = new Date(scheduleValue).toISOString()
-    const scheduleChanged = nextSchedule !== editingDemand.horarioInicio
+    const durationMinutes = parseDurationDisplayMinutes(duracaoPrevista)
+    const nextEndTime = durationMinutes
+      ? new Date(new Date(scheduleValue).getTime() + durationMinutes * 60_000).toISOString()
+      : editingDemand.horarioFim
 
-    if (scheduleChanged && !observationValue.trim()) {
+    const scheduleChanged = nextSchedule !== editingDemand.horarioInicio
+    const durationChanged = nextEndTime !== editingDemand.horarioFim
+
+    if ((scheduleChanged || durationChanged) && !observationValue.trim()) {
       setScheduleError(
-        "Informe uma observação para justificar a alteração de dia ou horário."
+        "Informe uma observação para justificar a alteração de dia, horário ou duração."
       )
       return
     }

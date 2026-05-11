@@ -83,6 +83,7 @@ export const parseCreateDemandData = (input: z.infer<typeof createDemandSchema>)
 
 export const parseScheduleUpdateData = (
   previousStartIso: string,
+  previousEndIso: string,
   input: z.infer<typeof updateScheduleSchema>
 ) => {
   const start = new Date(input.horarioInicio)
@@ -93,7 +94,9 @@ export const parseScheduleUpdateData = (
     throw new Error("Intervalo inválido")
   }
 
-  const moved = start.toISOString() !== previousStartIso
+  const moved =
+    start.toISOString() !== previousStartIso ||
+    end.toISOString() !== previousEndIso
 
   if (moved && !input.observacoes.trim()) {
     throw new Error("Informe observações para justificar o remanejamento")
