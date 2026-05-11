@@ -1,6 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { CreateDemandModal } from "@/components/organisms/create-demand-modal"
 import { DashboardHero } from "@/components/organisms/dashboard-hero"
@@ -8,8 +9,10 @@ import { DaySchedulePanel } from "@/components/organisms/day-schedule-panel"
 import { DemandCalendar } from "@/components/organisms/demand-calendar"
 import { DemandDetailsList } from "@/components/organisms/demand-details-list"
 import { DemandSummary } from "@/components/organisms/demand-summary"
-import { LoginScreen } from "@/components/organisms/login-screen"
+import { DemandSummaryDetailModal } from "@/components/organisms/demand-summary-detail-modal"
 import { ScheduleEditModal } from "@/components/organisms/schedule-edit-modal"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useSession } from "@/hooks/use-session"
 import {
   buildCalendarDays,
   getDateKey,
@@ -19,18 +22,20 @@ import {
   apiCreateDemand,
   apiGetDemands,
   apiGetTechnicians,
-  apiLogin,
-  apiLogout,
-  apiMe,
-  apiRefresh,
   apiUpdateSchedule,
   apiUpdateStatus,
 } from "@/lib/api"
-import { UserSession } from "@/lib/auth"
-import { Demand, DemandStatus, statusLabels } from "@/lib/demands"
+import {
+  Demand,
+  DemandStatus,
+  statusLabels,
+  type SummaryDetailSegment,
+} from "@/lib/demands"
 
 export function DemandsDashboard() {
-  const [session, setSession] = useState<UserSession | null>(null)
+  const router = useRouter()
+  const { session, status, logout } = useSession()
+
   const [demands, setDemands] = useState<Demand[]>([])
   const [availableTechnicians, setAvailableTechnicians] = useState<string[]>([])
   const [isBooting, setIsBooting] = useState(true)
@@ -42,12 +47,23 @@ export function DemandsDashboard() {
   const [observationValue, setObservationValue] = useState("")
   const [scheduleError, setScheduleError] = useState("")
   const [requestWarning, setRequestWarning] = useState("")
-  const [currentMonth, setCurrentMonth] = useState(
-    () => new Date(2026, 3, 1)
-  )
-  const [selectedDate, setSelectedDate] = useState(() => new Date(2026, 3, 30))
+  const [summarySegment, setSummarySegment] =
+    useState<SummaryDetailSegment | null>(null)
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
+  const [selectedDate, setSelectedDate] = useState(() => new Date())
 
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login")
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session) return
+
     const bootstrap = async () => {
       try {
         const technicians = await apiGetTechnicians()
@@ -57,13 +73,16 @@ export function DemandsDashboard() {
       }
 
       try {
-        const me = await apiMe().catch(async () => apiRefresh())
-        setSession(me)
-
         const loadedDemands = await apiGetDemands()
         setDemands(loadedDemands)
+
+        if (session.role === "eletricista") {
+          setSelectedTechnician(session.name)
+          const today = new Date()
+          setSelectedDate(today)
+          setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
+        }
       } catch {
-        setSession(null)
         setDemands([])
       } finally {
         setIsBooting(false)
@@ -71,7 +90,7 @@ export function DemandsDashboard() {
     }
 
     void bootstrap()
-  }, [])
+  }, [status, session])
 
   const technicians = useMemo(
     () => [
@@ -103,13 +122,19 @@ export function DemandsDashboard() {
 
   const statusTotals = useMemo(
     () =>
-      statusLabels.map((status) => ({
-        status,
-        total: filteredDemands.filter((demand) => demand.status === status)
+      statusLabels.map((statusLabel) => ({
+        status: statusLabel,
+        total: filteredDemands.filter((demand) => demand.status === statusLabel)
           .length,
       })),
     [filteredDemands]
   )
+
+  const summaryModalDemands = useMemo(() => {
+    if (!summarySegment) return []
+    if (summarySegment === "total") return filteredDemands
+    return filteredDemands.filter((d) => d.status === summarySegment)
+  }, [filteredDemands, summarySegment])
 
   const calendarDays = useMemo(
     () => buildCalendarDays(currentMonth),
@@ -135,12 +160,31 @@ export function DemandsDashboard() {
   const selectedDayDemands = demandsByDate[selectedDateKey] ?? []
 
   const handleChangeMonth = (direction: -1 | 1) => {
-    setCurrentMonth(
-      (month) => new Date(month.getFullYear(), month.getMonth() + direction, 1)
+    const nextMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() + direction,
+      1
     )
+    setCurrentMonth(nextMonth)
+    setSelectedDate((prev) => {
+      if (
+        prev.getFullYear() === nextMonth.getFullYear() &&
+        prev.getMonth() === nextMonth.getMonth()
+      ) {
+        return prev
+      }
+      const today = new Date()
+      if (
+        today.getFullYear() === nextMonth.getFullYear() &&
+        today.getMonth() === nextMonth.getMonth()
+      ) {
+        return new Date(today)
+      }
+      return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1)
+    })
   }
 
-  const handleUpdateStatus = async (id: string, status: DemandStatus) => {
+  const handleUpdateStatus = async (id: string, newStatus: DemandStatus) => {
     setGlobalError("")
     setRequestWarning("")
 
@@ -151,7 +195,7 @@ export function DemandsDashboard() {
     }
 
     try {
-      const response = await apiUpdateStatus(id, status, currentDemand.version)
+      const response = await apiUpdateStatus(id, newStatus, currentDemand.version)
 
       setDemands((currentDemands) =>
         currentDemands.map((demand) =>
@@ -200,39 +244,8 @@ export function DemandsDashboard() {
     }
   }
 
-  const handleLogin = async (credentials: {
-    role: "gestor" | "eletricista"
-    name: string
-    password: string
-  }) => {
-    setGlobalError("")
-    setRequestWarning("")
-
-    const nextSession = await apiLogin(credentials)
-    const loadedDemands = await apiGetDemands()
-
-    setSession(nextSession)
-    setDemands(loadedDemands)
-    setEditingDemand(null)
-
-    if (nextSession.role === "eletricista") {
-      setSelectedTechnician(nextSession.name)
-      const today = new Date()
-      setSelectedDate(today)
-      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
-
-      return
-    }
-
-    setSelectedTechnician("Todos")
-  }
-
   const handleLogout = () => {
-    void apiLogout().catch(() => null)
-    setSession(null)
-    setDemands([])
-    setSelectedTechnician("Todos")
-    setEditingDemand(null)
+    void logout()
   }
 
   const handleOpenScheduleEditor = (demand: Demand) => {
@@ -292,16 +305,12 @@ export function DemandsDashboard() {
     }
   }
 
-  if (isBooting) {
+  if (status === "loading" || status === "unauthenticated" || isBooting || !session) {
     return (
       <main className="grid min-h-svh place-items-center bg-slate-100 text-slate-700">
         Carregando SGDE...
       </main>
     )
-  }
-
-  if (!session) {
-    return <LoginScreen technicians={technicianOptions} onLogin={handleLogin} />
   }
 
   const isElectrician = session.role === "eletricista"
@@ -334,17 +343,46 @@ export function DemandsDashboard() {
         {isElectrician ? (
           <>
             <div className="md:hidden">
-              <DaySchedulePanel
-                demands={selectedDayDemands}
-                selectedDate={selectedDate}
-                onSelectDemand={handleOpenScheduleEditor}
-              />
+              <Tabs defaultValue="day" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="day">Agenda do Dia</TabsTrigger>
+                  <TabsTrigger value="list">Lista Completa</TabsTrigger>
+                </TabsList>
+                <TabsContent value="day" className="mt-4 flex flex-col gap-6">
+                  <DemandCalendar
+                    calendarDays={calendarDays}
+                    currentMonth={currentMonth}
+                    demandsByDate={demandsByDate}
+                    isTechnicianFilterLocked
+                    selectedDateKey={selectedDateKey}
+                    selectedTechnician={selectedTechnician}
+                    technicians={selectableTechnicians}
+                    onChangeMonth={handleChangeMonth}
+                    onChangeTechnician={setSelectedTechnician}
+                    onSelectDate={setSelectedDate}
+                    onSelectDemand={handleOpenScheduleEditor}
+                  />
+                </TabsContent>
+                <TabsContent value="list" className="mt-4 flex flex-col gap-6">
+                  <DemandSummary
+                    statusTotals={statusTotals}
+                    totalDemands={filteredDemands.length}
+                    onSelectSegment={setSummarySegment}
+                  />
+                  <DemandDetailsList
+                    demands={filteredDemands}
+                    onEditSchedule={handleOpenScheduleEditor}
+                    onUpdateStatus={handleUpdateStatus}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
 
             <div className="hidden flex-col gap-6 md:flex">
               <DemandSummary
                 statusTotals={statusTotals}
                 totalDemands={filteredDemands.length}
+                onSelectSegment={setSummarySegment}
               />
               <DemandCalendar
                 calendarDays={calendarDays}
@@ -373,32 +411,70 @@ export function DemandsDashboard() {
           </>
         ) : (
           <>
-            <DemandSummary
-              statusTotals={statusTotals}
-              totalDemands={filteredDemands.length}
-            />
-            <DemandCalendar
-              calendarDays={calendarDays}
-              currentMonth={currentMonth}
-              demandsByDate={demandsByDate}
-              selectedDateKey={selectedDateKey}
-              selectedTechnician={selectedTechnician}
-              technicians={selectableTechnicians}
-              onChangeMonth={handleChangeMonth}
-              onChangeTechnician={setSelectedTechnician}
-              onSelectDate={setSelectedDate}
-              onSelectDemand={handleOpenScheduleEditor}
-            />
-            <DaySchedulePanel
-              demands={selectedDayDemands}
-              selectedDate={selectedDate}
-              onSelectDemand={handleOpenScheduleEditor}
-            />
-            <DemandDetailsList
-              demands={filteredDemands}
-              onEditSchedule={handleOpenScheduleEditor}
-              onUpdateStatus={handleUpdateStatus}
-            />
+            <div className="md:hidden">
+              <Tabs defaultValue="day" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="day">Agenda do Dia</TabsTrigger>
+                  <TabsTrigger value="list">Lista Completa</TabsTrigger>
+                </TabsList>
+                <TabsContent value="day" className="mt-4 flex flex-col gap-6">
+                  <DemandCalendar
+                    calendarDays={calendarDays}
+                    currentMonth={currentMonth}
+                    demandsByDate={demandsByDate}
+                    selectedDateKey={selectedDateKey}
+                    selectedTechnician={selectedTechnician}
+                    technicians={selectableTechnicians}
+                    onChangeMonth={handleChangeMonth}
+                    onChangeTechnician={setSelectedTechnician}
+                    onSelectDate={setSelectedDate}
+                    onSelectDemand={handleOpenScheduleEditor}
+                  />
+                </TabsContent>
+                <TabsContent value="list" className="mt-4 flex flex-col gap-6">
+                  <DemandSummary
+                    statusTotals={statusTotals}
+                    totalDemands={filteredDemands.length}
+                    onSelectSegment={setSummarySegment}
+                  />
+                  <DemandDetailsList
+                    demands={filteredDemands}
+                    onEditSchedule={handleOpenScheduleEditor}
+                    onUpdateStatus={handleUpdateStatus}
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            <div className="hidden flex-col gap-6 md:flex">
+              <DemandSummary
+                statusTotals={statusTotals}
+                totalDemands={filteredDemands.length}
+                onSelectSegment={setSummarySegment}
+              />
+              <DemandCalendar
+                calendarDays={calendarDays}
+                currentMonth={currentMonth}
+                demandsByDate={demandsByDate}
+                selectedDateKey={selectedDateKey}
+                selectedTechnician={selectedTechnician}
+                technicians={selectableTechnicians}
+                onChangeMonth={handleChangeMonth}
+                onChangeTechnician={setSelectedTechnician}
+                onSelectDate={setSelectedDate}
+                onSelectDemand={handleOpenScheduleEditor}
+              />
+              <DaySchedulePanel
+                demands={selectedDayDemands}
+                selectedDate={selectedDate}
+                onSelectDemand={handleOpenScheduleEditor}
+              />
+              <DemandDetailsList
+                demands={filteredDemands}
+                onEditSchedule={handleOpenScheduleEditor}
+                onUpdateStatus={handleUpdateStatus}
+              />
+            </div>
           </>
         )}
       </section>
@@ -432,6 +508,15 @@ export function DemandsDashboard() {
           onCreate={handleCreateDemand}
         />
       ) : null}
+
+      <DemandSummaryDetailModal
+        demands={summaryModalDemands}
+        segment={summarySegment}
+        onEditSchedule={handleOpenScheduleEditor}
+        onOpenChange={(open) => {
+          if (!open) setSummarySegment(null)
+        }}
+      />
     </main>
   )
 }

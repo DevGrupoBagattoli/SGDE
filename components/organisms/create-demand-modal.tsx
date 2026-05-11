@@ -35,7 +35,6 @@ export function CreateDemandModal({
   }, [currentTechnician, session.name, session.role, technicians])
 
   const [tecnico, setTecnico] = useState(initialTechnician)
-  const [equipe, setEquipe] = useState("")
   const [local, setLocal] = useState("")
   const [descricao, setDescricao] = useState("")
   const [horarioInicio, setHorarioInicio] = useState("")
@@ -50,7 +49,7 @@ export function CreateDemandModal({
 
     onCreate({
       tecnico,
-      equipe: equipe.trim() || "Sem equipe",
+      equipe: "Sem equipe",
       local: local.trim(),
       descricao: descricao.trim(),
       horarioInicio: new Date(horarioInicio).toISOString(),
@@ -108,16 +107,6 @@ export function CreateDemandModal({
           </label>
 
           <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Equipe
-            <input
-              className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              placeholder="Alpha"
-              value={equipe}
-              onChange={(event) => setEquipe(event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-2 text-sm font-medium text-slate-700 md:col-span-2">
             Local
             <input
               className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"

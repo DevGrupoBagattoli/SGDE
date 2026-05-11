@@ -1,66 +1,80 @@
 "use client"
 
 import { FormEvent, useState } from "react"
-import { HardHat, ShieldCheck } from "lucide-react"
+import { Eye, EyeOff, HardHat, ShieldCheck } from "lucide-react"
+import { z } from "zod"
 
 import { LoginRoleCard } from "@/components/molecules/login-role-card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { LoginInput, loginSchema } from "@/lib/schemas/login"
 
 type LoginScreenProps = {
-  technicians: string[]
-  onLogin: (credentials: {
-    role: "gestor" | "eletricista"
-    name: string
-    password: string
-  }) => Promise<void>
+  technicians: { id: string; name: string }[]
+  onLogin: (credentials: LoginInput) => Promise<void>
+  isLoading?: boolean
+  error?: string
 }
 
-export function LoginScreen({ technicians, onLogin }: LoginScreenProps) {
-  const [managerName, setManagerName] = useState("Gestor Operacional")
-  const [managerPassword, setManagerPassword] = useState("admin123")
-  const [technicianName, setTechnicianName] = useState(technicians[0] ?? "")
-  const [technicianPin, setTechnicianPin] = useState("1234")
-  const [error, setError] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+export function LoginScreen({ technicians, onLogin, isLoading, error: externalError }: LoginScreenProps) {
+  const [managerName, setManagerName] = useState("")
+  const [managerPassword, setManagerPassword] = useState("")
+  const [showManagerPassword, setShowManagerPassword] = useState(false)
+
+  const [technicianName, setTechnicianName] = useState("")
+  const [technicianPin, setTechnicianPin] = useState("")
+  const [showTechnicianPin, setShowTechnicianPin] = useState(false)
+
+  const [localError, setLocalError] = useState("")
 
   const handleManagerLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setError("")
-    setIsSubmitting(true)
+    setLocalError("")
 
     try {
-      await onLogin({
+      const payload = loginSchema.parse({
         role: "gestor",
         name: managerName.trim() || "Gestor",
         password: managerPassword,
       })
-    } catch (loginError) {
-      setError(
-        loginError instanceof Error ? loginError.message : "Falha no login"
-      )
-    } finally {
-      setIsSubmitting(false)
+      await onLogin(payload)
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        setLocalError(err.issues[0].message)
+      } else {
+        setLocalError(err instanceof Error ? err.message : "Falha no login")
+      }
     }
   }
 
   const handleTechnicianLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setError("")
-    setIsSubmitting(true)
+    setLocalError("")
 
     try {
-      await onLogin({
+      const payload = loginSchema.parse({
         role: "eletricista",
         name: technicianName,
         password: technicianPin,
       })
-    } catch (loginError) {
-      setError(
-        loginError instanceof Error ? loginError.message : "Falha no login"
-      )
-    } finally {
-      setIsSubmitting(false)
+      await onLogin(payload)
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        setLocalError(err.issues[0].message)
+      } else {
+        setLocalError(err instanceof Error ? err.message : "Falha no login")
+      }
     }
   }
+
+  const displayError = localError || externalError
 
   return (
     <main className="min-h-svh bg-slate-100 px-4 py-8 text-slate-950 sm:px-6 lg:px-8">
@@ -85,25 +99,39 @@ export function LoginScreen({ technicians, onLogin }: LoginScreenProps) {
             title="Gestor"
             onSubmit={handleManagerLogin}
           >
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Nome do gestor
-              <input
-                className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            <div className="grid gap-2">
+              <Label htmlFor="manager-name">Nome do gestor</Label>
+              <Input
+                id="manager-name"
                 required
                 value={managerName}
                 onChange={(event) => setManagerName(event.target.value)}
               />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Senha
-              <input
-                className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                value={managerPassword}
-                required
-                type="password"
-                onChange={(event) => setManagerPassword(event.target.value)}
-              />
-            </label>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="manager-password">Senha</Label>
+              <div className="relative">
+                <Input
+                  id="manager-password"
+                  required
+                  type={showManagerPassword ? "text" : "password"}
+                  value={managerPassword}
+                  onChange={(event) => setManagerPassword(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                  onClick={() => setShowManagerPassword(!showManagerPassword)}
+                  tabIndex={-1}
+                >
+                  {showManagerPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
+            </div>
           </LoginRoleCard>
 
           <LoginRoleCard
@@ -112,42 +140,60 @@ export function LoginScreen({ technicians, onLogin }: LoginScreenProps) {
             title="Eletricista"
             onSubmit={handleTechnicianLogin}
           >
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Eletricista
-              <select
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                required
+            <div className="grid gap-2">
+              <Label htmlFor="technician-name">Eletricista</Label>
+              <Select
                 value={technicianName}
-                onChange={(event) => setTechnicianName(event.target.value)}
-              >
-                {technicians.map((technician) => (
-                  <option key={technician} value={technician}>
-                    {technician}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              PIN de campo
-              <input
-                className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                value={technicianPin}
-                inputMode="numeric"
+                onValueChange={setTechnicianName}
                 required
-                type="password"
-                onChange={(event) => setTechnicianPin(event.target.value)}
-              />
-            </label>
+              >
+                <SelectTrigger id="technician-name">
+                  <SelectValue placeholder="Selecione o eletricista" />
+                </SelectTrigger>
+                <SelectContent>
+                  {technicians.map((technician) => (
+                    <SelectItem key={technician.id} value={technician.name}>
+                      {technician.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="technician-pin">PIN de campo</Label>
+              <div className="relative">
+                <Input
+                  id="technician-pin"
+                  inputMode="numeric"
+                  required
+                  type={showTechnicianPin ? "text" : "password"}
+                  value={technicianPin}
+                  onChange={(event) => setTechnicianPin(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                  onClick={() => setShowTechnicianPin(!showTechnicianPin)}
+                  tabIndex={-1}
+                >
+                  {showTechnicianPin ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
+            </div>
           </LoginRoleCard>
         </div>
 
-        {error ? (
+        {displayError ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-            {error}
+            {displayError}
           </div>
         ) : null}
 
-        {isSubmitting ? (
+        {isLoading ? (
           <div className="text-sm font-medium text-slate-600">Autenticando...</div>
         ) : null}
       </section>

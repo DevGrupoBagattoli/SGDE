@@ -40,6 +40,12 @@ const withCsrf = (method: string) => {
   return csrf ? { "x-csrf-token": csrf } : {}
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+export const setUnauthorizedHandler = (handler: (() => void) | null) => {
+  unauthorizedHandler = handler
+}
+
 const request = async <T>(
   path: string,
   init: RequestInit = {}
@@ -56,12 +62,18 @@ const request = async <T>(
     headers.set(key, value)
   })
 
+  const isCredentialsEndpoint = path === "/api/auth/login"
+
   const response = await fetch(path, {
     ...init,
     headers,
     credentials: "include",
     cache: "no-store",
   })
+
+  if (response.status === 401 && !isCredentialsEndpoint && unauthorizedHandler) {
+    unauthorizedHandler()
+  }
 
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
 
@@ -148,3 +160,51 @@ export const apiUpdateSchedule = async (
 
   return result
 }
+
+export type UserDto = {
+  id: string
+  name: string
+  role: "gestor" | "eletricista"
+  createdAt: string
+  updatedAt: string
+}
+
+export const apiGetUsers = async () => {
+  const result = await request<{ users: UserDto[] }>("/api/users")
+  return result.data.users
+}
+
+export const apiCreateUser = async (payload: {
+  name: string
+  role: "gestor" | "eletricista"
+  password?: string
+}) => {
+  const result = await request<{ user: UserDto }>("/api/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+  return result
+}
+
+export const apiUpdateUser = async (
+  id: string,
+  payload: {
+    name?: string
+    role?: "gestor" | "eletricista"
+    password?: string
+  }
+) => {
+  const result = await request<{ user: UserDto }>(`/api/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  })
+  return result
+}
+
+export const apiDeleteUser = async (id: string) => {
+  const result = await request<{ deletedUser: UserDto }>(`/api/users/${id}`, {
+    method: "DELETE",
+  })
+  return result
+}
+

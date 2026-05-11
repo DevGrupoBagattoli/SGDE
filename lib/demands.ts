@@ -2,6 +2,9 @@ import { CheckCircle2, TimerReset, UsersRound } from "lucide-react"
 
 export type DemandStatus = "Pendente" | "Em Andamento" | "Concluído"
 
+/** Filtro do modal de resumo (card Total ou um status). */
+export type SummaryDetailSegment = "total" | DemandStatus
+
 export type Demand = {
   id: string
   tecnico: string
@@ -16,6 +19,31 @@ export type Demand = {
   participantes: string[]
   version: number
   dateKeys: string[]
+}
+
+export const parseDurationDisplayMinutes = (value: string): number | null => {
+  const match = value.match(/^(\d{2}):(\d{2})h$/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59) {
+    return null
+  }
+  const total = hours * 60 + minutes
+  return total > 0 ? total : null
+}
+
+export const predictedEndDate = (demand: Demand): Date => {
+  const start = new Date(demand.horarioInicio)
+  const fromDuration = parseDurationDisplayMinutes(demand.duracaoPrevista)
+  if (fromDuration != null) {
+    return new Date(start.getTime() + fromDuration * 60_000)
+  }
+  const end = new Date(demand.horarioFim)
+  if (!Number.isNaN(end.getTime()) && end.getTime() > start.getTime()) {
+    return end
+  }
+  return new Date(start.getTime() + 60 * 60_000)
 }
 
 export const mockDemands: Demand[] = [
