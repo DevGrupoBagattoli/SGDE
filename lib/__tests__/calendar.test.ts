@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals"
 
 import {
   buildCalendarDays,
+  enumerateDateKeysLocal,
   getDateKey,
   toDateTimeLocalValue,
 } from "@/lib/calendar"
@@ -18,6 +19,17 @@ describe("toDateTimeLocalValue", () => {
     expect(toDateTimeLocalValue("2026-05-11T14:30:00.000Z")).toBe(
       "2026-05-11T14:30"
     )
+  })
+})
+
+describe("enumerateDateKeysLocal", () => {
+  it("inclui cada dia civil local entre início e fim", () => {
+    const start = new Date(2026, 4, 10, 22, 0, 0)
+    const end = new Date(2026, 4, 11, 6, 0, 0)
+    expect(enumerateDateKeysLocal(start, end)).toEqual([
+      "2026-05-10",
+      "2026-05-11",
+    ])
   })
 })
 

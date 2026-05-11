@@ -32,6 +32,27 @@ export const getDateKey = (date: Date) =>
     String(date.getDate()).padStart(2, "0"),
   ].join("-")
 
+const startOfLocalDay = (instant: Date) =>
+  new Date(instant.getFullYear(), instant.getMonth(), instant.getDate())
+
+/** Dias civis locais entre início e fim (inclusive), alinhado ao calendário da UI. */
+export const enumerateDateKeysLocal = (start: Date, end: Date) => {
+  const keys: string[] = []
+  const current = startOfLocalDay(start)
+  const last = startOfLocalDay(end)
+
+  if (current.getTime() > last.getTime()) {
+    return [getDateKey(startOfLocalDay(start))]
+  }
+
+  while (current.getTime() <= last.getTime()) {
+    keys.push(getDateKey(current))
+    current.setDate(current.getDate() + 1)
+  }
+
+  return keys
+}
+
 export const buildCalendarDays = (month: Date) => {
   const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1)
   const calendarStart = new Date(firstDayOfMonth)

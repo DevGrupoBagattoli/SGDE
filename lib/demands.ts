@@ -33,6 +33,34 @@ export const parseDurationDisplayMinutes = (value: string): number | null => {
   return total > 0 ? total : null
 }
 
+/** Lê `HH:MMh` ou texto tipo `2:30` / `02:30h` (ex.: dados antigos) para horas e minutos. */
+export const parseDuracaoParts = (raw: string): { hours: number; minutes: number } => {
+  const s = raw.trim().replace(/\s+/g, "").replace(/h$/i, "")
+  if (!s) return { hours: 1, minutes: 0 }
+
+  const m = /^(\d{1,3}):(\d{1,2})$/.exec(s)
+  if (!m) return { hours: 1, minutes: 0 }
+
+  let hours = Number.parseInt(m[1], 10)
+  let minutes = Number.parseInt(m[2], 10)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return { hours: 1, minutes: 0 }
+
+  hours = Math.min(99, Math.max(0, hours))
+  minutes = Math.min(59, Math.max(0, minutes))
+
+  if (hours === 0 && minutes === 0) return { hours: 1, minutes: 0 }
+
+  return { hours, minutes }
+}
+
+/** Monta `HH:MMh` para a API a partir dos campos do formulário (0–99 h, 0–59 min). */
+export const formatDuracaoFromParts = (hours: number, minutes: number): string => {
+  const h = Math.min(99, Math.max(0, Math.floor(Number.isFinite(hours) ? hours : 0)))
+  const min = Math.min(59, Math.max(0, Math.floor(Number.isFinite(minutes) ? minutes : 0)))
+  if (h === 0 && min === 0) return "01:00h"
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}h`
+}
+
 export const predictedEndDate = (demand: Demand): Date => {
   const start = new Date(demand.horarioInicio)
   const fromDuration = parseDurationDisplayMinutes(demand.duracaoPrevista)

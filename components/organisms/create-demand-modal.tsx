@@ -5,7 +5,12 @@ import { X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { UserSession } from "@/lib/auth"
-import { Demand, DemandStatus, statusOptions } from "@/lib/demands"
+import {
+  Demand,
+  DemandStatus,
+  formatDuracaoFromParts,
+  statusOptions,
+} from "@/lib/demands"
 
 type CreateDemandInput = Omit<Demand, "id" | "horarioFim" | "version" | "dateKeys">
 
@@ -16,6 +21,9 @@ type CreateDemandModalProps = {
   onClose: () => void
   onCreate: (demand: CreateDemandInput) => Promise<void> | void
 }
+
+const clamp = (n: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, Math.floor(Number.isFinite(n) ? n : 0)))
 
 export function CreateDemandModal({
   currentTechnician,
@@ -38,11 +46,13 @@ export function CreateDemandModal({
   const [local, setLocal] = useState("")
   const [descricao, setDescricao] = useState("")
   const [horarioInicio, setHorarioInicio] = useState("")
-  const [duracaoPrevista, setDuracaoPrevista] = useState("01:00h")
+  const [durHours, setDurHours] = useState(1)
+  const [durMinutes, setDurMinutes] = useState(0)
   const [status, setStatus] = useState<DemandStatus>("Pendente")
   const [observacoes, setObservacoes] = useState("")
 
   const isTechnicianLocked = session.role === "eletricista"
+  const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -53,7 +63,7 @@ export function CreateDemandModal({
       local: local.trim(),
       descricao: descricao.trim(),
       horarioInicio: new Date(horarioInicio).toISOString(),
-      duracaoPrevista,
+      duracaoPrevista: duracaoPreview,
       status,
       observacoes: observacoes.trim(),
       participantes: [],
@@ -139,16 +149,61 @@ export function CreateDemandModal({
             />
           </label>
 
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
-            Duração prevista
-            <input
-              className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              placeholder="01:00h"
-              required
-              value={duracaoPrevista}
-              onChange={(event) => setDuracaoPrevista(event.target.value)}
-            />
-          </label>
+          <div className="grid gap-2">
+            <span className="text-sm font-medium text-slate-700">
+              Duração prevista
+            </span>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="grid w-23 gap-1.5 text-xs font-medium text-slate-500">
+                Horas
+                <input
+                  className="h-11 w-full rounded-2xl border border-slate-200 px-3 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  inputMode="numeric"
+                  max={99}
+                  min={0}
+                  type="number"
+                  value={durHours}
+                  onChange={(event) =>
+                    setDurHours(
+                      clamp(
+                        event.target.value === ""
+                          ? 0
+                          : Number(event.target.value),
+                        0,
+                        99,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <label className="grid w-23 gap-1.5 text-xs font-medium text-slate-500">
+                Minutos
+                <input
+                  className="h-11 w-full rounded-2xl border border-slate-200 px-3 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  inputMode="numeric"
+                  max={59}
+                  min={0}
+                  type="number"
+                  value={durMinutes}
+                  onChange={(event) =>
+                    setDurMinutes(
+                      clamp(
+                        event.target.value === ""
+                          ? 0
+                          : Number(event.target.value),
+                        0,
+                        59,
+                      ),
+                    )
+                  }
+                />
+              </label>
+            </div>
+            <p className="text-xs text-slate-500">
+              Estimativa de trabalho (máx. 99 h e 59 min). Registro:{" "}
+              <span className="font-medium text-slate-700">{duracaoPreview}</span>
+            </p>
+          </div>
 
           <label className="grid gap-2 text-sm font-medium text-slate-700">
             Status inicial

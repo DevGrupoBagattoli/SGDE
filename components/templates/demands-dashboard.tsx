@@ -4,6 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { CreateDemandModal } from "@/components/organisms/create-demand-modal"
+import {
+  DashboardMobileSidebar,
+  type DashboardMobileMainView,
+} from "@/components/organisms/dashboard-mobile-sidebar"
 import { DashboardHero } from "@/components/organisms/dashboard-hero"
 import { DaySchedulePanel } from "@/components/organisms/day-schedule-panel"
 import { DemandCalendar } from "@/components/organisms/demand-calendar"
@@ -11,10 +15,10 @@ import { DemandDetailsList } from "@/components/organisms/demand-details-list"
 import { DemandSummary } from "@/components/organisms/demand-summary"
 import { DemandSummaryDetailModal } from "@/components/organisms/demand-summary-detail-modal"
 import { ScheduleEditModal } from "@/components/organisms/schedule-edit-modal"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSession } from "@/hooks/use-session"
 import {
   buildCalendarDays,
+  enumerateDateKeysLocal,
   getDateKey,
   toDateTimeLocalValue,
 } from "@/lib/calendar"
@@ -49,6 +53,9 @@ export function DemandsDashboard() {
   const [requestWarning, setRequestWarning] = useState("")
   const [summarySegment, setSummarySegment] =
     useState<SummaryDetailSegment | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [mobileMainView, setMobileMainView] =
+    useState<DashboardMobileMainView>("day")
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -143,10 +150,10 @@ export function DemandsDashboard() {
 
   const demandsByDate = useMemo(() => {
     return filteredDemands.reduce<Record<string, Demand[]>>((acc, demand) => {
-      const keys =
-        demand.dateKeys && demand.dateKeys.length > 0
-          ? demand.dateKeys
-          : [getDateKey(new Date(demand.horarioInicio))]
+      const keys = enumerateDateKeysLocal(
+        new Date(demand.horarioInicio),
+        new Date(demand.horarioFim),
+      )
 
       keys.forEach((dateKey) => {
         acc[dateKey] = [...(acc[dateKey] ?? []), demand]
@@ -320,14 +327,19 @@ export function DemandsDashboard() {
   return (
     <main className="min-h-svh bg-slate-100 text-slate-950">
       <DashboardHero
-        isManager={isManager}
         session={session}
+        onMenuOpen={() => setMobileNavOpen(true)}
+      />
+
+      <DashboardMobileSidebar
+        layout="demands"
+        isManager={isManager}
         totalDemands={filteredDemands.length}
-        onCreateDemand={() => {
-          if (!isManager) return
-          setIsCreateModalOpen(true)
-        }}
+        open={mobileNavOpen}
+        view={mobileMainView}
+        onOpenChange={setMobileNavOpen}
         onLogout={handleLogout}
+        onViewChange={setMobileMainView}
       />
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         {globalError ? (
@@ -340,143 +352,77 @@ export function DemandsDashboard() {
             {requestWarning}
           </div>
         ) : null}
-        {isElectrician ? (
-          <>
-            <div className="md:hidden">
-              <Tabs defaultValue="day" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="day">Agenda do Dia</TabsTrigger>
-                  <TabsTrigger value="list">Lista Completa</TabsTrigger>
-                </TabsList>
-                <TabsContent value="day" className="mt-4 flex flex-col gap-6">
-                  <DemandCalendar
-                    calendarDays={calendarDays}
-                    currentMonth={currentMonth}
-                    demandsByDate={demandsByDate}
-                    isTechnicianFilterLocked
-                    selectedDateKey={selectedDateKey}
-                    selectedTechnician={selectedTechnician}
-                    technicians={selectableTechnicians}
-                    onChangeMonth={handleChangeMonth}
-                    onChangeTechnician={setSelectedTechnician}
-                    onSelectDate={setSelectedDate}
-                    onSelectDemand={handleOpenScheduleEditor}
-                  />
-                </TabsContent>
-                <TabsContent value="list" className="mt-4 flex flex-col gap-6">
-                  <DemandSummary
-                    statusTotals={statusTotals}
-                    totalDemands={filteredDemands.length}
-                    onSelectSegment={setSummarySegment}
-                  />
-                  <DemandDetailsList
-                    demands={filteredDemands}
-                    onEditSchedule={handleOpenScheduleEditor}
-                    onUpdateStatus={handleUpdateStatus}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            <div className="hidden flex-col gap-6 md:flex">
-              <DemandSummary
-                statusTotals={statusTotals}
-                totalDemands={filteredDemands.length}
-                onSelectSegment={setSummarySegment}
-              />
+        <>
+          <div className="flex flex-col gap-4 md:hidden">
+            {mobileMainView === "day" ? (
               <DemandCalendar
                 calendarDays={calendarDays}
                 currentMonth={currentMonth}
                 demandsByDate={demandsByDate}
-                isTechnicianFilterLocked
+                isTechnicianFilterLocked={isElectrician}
                 selectedDateKey={selectedDateKey}
                 selectedTechnician={selectedTechnician}
                 technicians={selectableTechnicians}
+                showCreateButton={isManager}
                 onChangeMonth={handleChangeMonth}
                 onChangeTechnician={setSelectedTechnician}
+                onCreateDemand={
+                  isManager ? () => setIsCreateModalOpen(true) : undefined
+                }
                 onSelectDate={setSelectedDate}
                 onSelectDemand={handleOpenScheduleEditor}
               />
-              <DaySchedulePanel
-                demands={selectedDayDemands}
-                selectedDate={selectedDate}
-                onSelectDemand={handleOpenScheduleEditor}
-              />
-              <DemandDetailsList
-                demands={filteredDemands}
-                onEditSchedule={handleOpenScheduleEditor}
-                onUpdateStatus={handleUpdateStatus}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="md:hidden">
-              <Tabs defaultValue="day" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="day">Agenda do Dia</TabsTrigger>
-                  <TabsTrigger value="list">Lista Completa</TabsTrigger>
-                </TabsList>
-                <TabsContent value="day" className="mt-4 flex flex-col gap-6">
-                  <DemandCalendar
-                    calendarDays={calendarDays}
-                    currentMonth={currentMonth}
-                    demandsByDate={demandsByDate}
-                    selectedDateKey={selectedDateKey}
-                    selectedTechnician={selectedTechnician}
-                    technicians={selectableTechnicians}
-                    onChangeMonth={handleChangeMonth}
-                    onChangeTechnician={setSelectedTechnician}
-                    onSelectDate={setSelectedDate}
-                    onSelectDemand={handleOpenScheduleEditor}
-                  />
-                </TabsContent>
-                <TabsContent value="list" className="mt-4 flex flex-col gap-6">
-                  <DemandSummary
-                    statusTotals={statusTotals}
-                    totalDemands={filteredDemands.length}
-                    onSelectSegment={setSummarySegment}
-                  />
-                  <DemandDetailsList
-                    demands={filteredDemands}
-                    onEditSchedule={handleOpenScheduleEditor}
-                    onUpdateStatus={handleUpdateStatus}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <DemandSummary
+                  statusTotals={statusTotals}
+                  totalDemands={filteredDemands.length}
+                  onSelectSegment={setSummarySegment}
+                />
+                <DemandDetailsList
+                  demands={filteredDemands}
+                  onEditSchedule={handleOpenScheduleEditor}
+                  onUpdateStatus={handleUpdateStatus}
+                />
+              </div>
+            )}
+          </div>
 
-            <div className="hidden flex-col gap-6 md:flex">
-              <DemandSummary
-                statusTotals={statusTotals}
-                totalDemands={filteredDemands.length}
-                onSelectSegment={setSummarySegment}
-              />
-              <DemandCalendar
-                calendarDays={calendarDays}
-                currentMonth={currentMonth}
-                demandsByDate={demandsByDate}
-                selectedDateKey={selectedDateKey}
-                selectedTechnician={selectedTechnician}
-                technicians={selectableTechnicians}
-                onChangeMonth={handleChangeMonth}
-                onChangeTechnician={setSelectedTechnician}
-                onSelectDate={setSelectedDate}
-                onSelectDemand={handleOpenScheduleEditor}
-              />
-              <DaySchedulePanel
-                demands={selectedDayDemands}
-                selectedDate={selectedDate}
-                onSelectDemand={handleOpenScheduleEditor}
-              />
-              <DemandDetailsList
-                demands={filteredDemands}
-                onEditSchedule={handleOpenScheduleEditor}
-                onUpdateStatus={handleUpdateStatus}
-              />
-            </div>
-          </>
-        )}
+          <div className="hidden flex-col gap-6 md:flex">
+            <DemandSummary
+              statusTotals={statusTotals}
+              totalDemands={filteredDemands.length}
+              onSelectSegment={setSummarySegment}
+            />
+            <DemandCalendar
+              calendarDays={calendarDays}
+              currentMonth={currentMonth}
+              demandsByDate={demandsByDate}
+              isTechnicianFilterLocked={isElectrician}
+              selectedDateKey={selectedDateKey}
+              selectedTechnician={selectedTechnician}
+              technicians={selectableTechnicians}
+              showCreateButton={isManager}
+              onChangeMonth={handleChangeMonth}
+              onChangeTechnician={setSelectedTechnician}
+              onCreateDemand={
+                isManager ? () => setIsCreateModalOpen(true) : undefined
+              }
+              onSelectDate={setSelectedDate}
+              onSelectDemand={handleOpenScheduleEditor}
+            />
+            <DaySchedulePanel
+              demands={selectedDayDemands}
+              selectedDate={selectedDate}
+              onSelectDemand={handleOpenScheduleEditor}
+            />
+            <DemandDetailsList
+              demands={filteredDemands}
+              onEditSchedule={handleOpenScheduleEditor}
+              onUpdateStatus={handleUpdateStatus}
+            />
+          </div>
+        </>
       </section>
 
       {editingDemand ? (

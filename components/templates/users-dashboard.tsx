@@ -16,6 +16,7 @@ import {
   UserDto,
 } from "@/lib/api"
 import { DashboardHero } from "@/components/organisms/dashboard-hero"
+import { DashboardMobileSidebar } from "@/components/organisms/dashboard-mobile-sidebar"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,7 @@ export function UsersDashboard() {
 
   const [userToDelete, setUserToDelete] = useState<UserDto | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -133,11 +135,18 @@ export function UsersDashboard() {
   return (
     <main className="min-h-svh bg-slate-100 text-slate-950">
       <DashboardHero
-        isManager={true}
         session={session}
-        totalDemands={0} // Não estamos mostrando demandas aqui, mas o componente requer
-        onCreateDemand={() => router.push("/dashboard")}
+        onMenuOpen={() => setNavOpen(true)}
+      />
+
+      <DashboardMobileSidebar
+        layout="users"
+        isManager
+        open={navOpen}
+        onOpenChange={setNavOpen}
         onLogout={handleLogout}
+        view="day"
+        onViewChange={() => {}}
       />
 
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">

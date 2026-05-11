@@ -1,10 +1,14 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useEffect, useState } from "react"
 import { UserPlus, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Demand } from "@/lib/demands"
+import {
+  Demand,
+  formatDuracaoFromParts,
+  parseDuracaoParts,
+} from "@/lib/demands"
 
 type ScheduleEditModalProps = {
   allTechnicians: string[]
@@ -22,6 +26,9 @@ type ScheduleEditModalProps = {
   ) => Promise<void> | void
 }
 
+const clamp = (n: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, Math.floor(Number.isFinite(n) ? n : 0)))
+
 export function ScheduleEditModal({
   allTechnicians,
   demand,
@@ -36,10 +43,22 @@ export function ScheduleEditModal({
   const [participantes, setParticipantes] = useState<string[]>(
     demand.participantes ?? []
   )
-  const [duracaoPrevista, setDuracaoPrevista] = useState(
-    demand.duracaoPrevista
-  )
+  const initialDur = parseDuracaoParts(demand.duracaoPrevista)
+  const [durHours, setDurHours] = useState(initialDur.hours)
+  const [durMinutes, setDurMinutes] = useState(initialDur.minutes)
   const [selectedToAdd, setSelectedToAdd] = useState("")
+
+  useEffect(() => {
+    setParticipantes(demand.participantes ?? [])
+  }, [demand.id])
+
+  useEffect(() => {
+    const p = parseDuracaoParts(demand.duracaoPrevista)
+    setDurHours(p.hours)
+    setDurMinutes(p.minutes)
+  }, [demand.id, demand.duracaoPrevista])
+
+  const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
 
   const available = allTechnicians.filter(
     (t) => t !== demand.tecnico && !participantes.includes(t)
@@ -64,7 +83,9 @@ export function ScheduleEditModal({
     >
       <form
         className="max-h-[90svh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
-        onSubmit={(e) => onSubmit(e, participantes, duracaoPrevista)}
+        onSubmit={(e) =>
+          onSubmit(e, participantes, duracaoPreview)
+        }
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -97,16 +118,61 @@ export function ScheduleEditModal({
               />
             </label>
 
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Duração prevista
-              <input
-                className="h-11 rounded-2xl border border-slate-200 px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                placeholder="01:00h"
-                required
-                value={duracaoPrevista}
-                onChange={(event) => setDuracaoPrevista(event.target.value)}
-              />
-            </label>
+            <div className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">
+                Duração prevista
+              </span>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="grid w-23 gap-1.5 text-xs font-medium text-slate-500">
+                  Horas
+                  <input
+                    className="h-11 w-full rounded-2xl border border-slate-200 px-3 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    inputMode="numeric"
+                    max={99}
+                    min={0}
+                    type="number"
+                    value={durHours}
+                    onChange={(event) =>
+                      setDurHours(
+                        clamp(
+                          event.target.value === ""
+                            ? 0
+                            : Number(event.target.value),
+                          0,
+                          99,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="grid w-23 gap-1.5 text-xs font-medium text-slate-500">
+                  Minutos
+                  <input
+                    className="h-11 w-full rounded-2xl border border-slate-200 px-3 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    inputMode="numeric"
+                    max={59}
+                    min={0}
+                    type="number"
+                    value={durMinutes}
+                    onChange={(event) =>
+                      setDurMinutes(
+                        clamp(
+                          event.target.value === ""
+                            ? 0
+                            : Number(event.target.value),
+                          0,
+                          59,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-slate-500">
+                Máx. 99 h e 59 min. Registro:{" "}
+                <span className="font-medium text-slate-700">{duracaoPreview}</span>
+              </p>
+            </div>
           </div>
 
           <label className="grid gap-2 text-sm font-medium text-slate-700">

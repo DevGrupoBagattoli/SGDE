@@ -2,6 +2,8 @@ import { describe, expect, it } from "@jest/globals"
 
 import type { Demand } from "@/lib/demands"
 import {
+  formatDuracaoFromParts,
+  parseDuracaoParts,
   parseDurationDisplayMinutes,
   predictedEndDate,
 } from "@/lib/demands"
@@ -41,6 +43,20 @@ describe("parseDurationDisplayMinutes", () => {
 
   it("rejeita duração zero", () => {
     expect(parseDurationDisplayMinutes("00:00h")).toBeNull()
+  })
+})
+
+describe("parseDuracaoParts / formatDuracaoFromParts", () => {
+  it("interpreta string e volta ao formato da API", () => {
+    expect(parseDuracaoParts("2:30")).toEqual({ hours: 2, minutes: 30 })
+    expect(formatDuracaoFromParts(2, 30)).toBe("02:30h")
+    expect(parseDuracaoParts("24:00h")).toEqual({ hours: 24, minutes: 0 })
+    expect(formatDuracaoFromParts(24, 0)).toBe("24:00h")
+  })
+
+  it("usa 1h quando inválido ou duração zero", () => {
+    expect(parseDuracaoParts("xx")).toEqual({ hours: 1, minutes: 0 })
+    expect(formatDuracaoFromParts(0, 0)).toBe("01:00h")
   })
 })
 
