@@ -8,7 +8,26 @@ import {
 } from "@jest/globals"
 
 describe("fluxo de auth na API client", () => {
+  // Tipo explícito para o TypeScript não inferir `never` no `mockResolvedValue`.
+  // A API client espera um `fetch` que retorna uma Promise e depois lê `ok/status/json()`.
   const fetchMock = jest.fn()
+
+  type AuthApiResponse =
+    | {
+        success: false
+        error: { code: string; message: string }
+      }
+    | {
+        success: true
+        data: { role: string; name: string }
+        warnings: unknown[]
+      }
+
+  type FetchMockResolved = {
+    ok: boolean
+    status: number
+    json: () => Promise<AuthApiResponse>
+  }
 
   beforeEach(() => {
     fetchMock.mockReset()
@@ -25,7 +44,11 @@ describe("fluxo de auth na API client", () => {
     const { apiMe, setUnauthorizedHandler } = await import("@/lib/api")
     setUnauthorizedHandler(handler)
 
-    fetchMock.mockResolvedValue({
+    ;(
+      fetchMock as unknown as {
+        mockResolvedValue: (value: FetchMockResolved) => void
+      }
+    ).mockResolvedValue({
       ok: false,
       status: 401,
       json: async () => ({
@@ -43,7 +66,11 @@ describe("fluxo de auth na API client", () => {
     const { apiLogin, setUnauthorizedHandler } = await import("@/lib/api")
     setUnauthorizedHandler(handler)
 
-    fetchMock.mockResolvedValue({
+    ;(
+      fetchMock as unknown as {
+        mockResolvedValue: (value: FetchMockResolved) => void
+      }
+    ).mockResolvedValue({
       ok: false,
       status: 401,
       json: async () => ({
@@ -66,7 +93,11 @@ describe("fluxo de auth na API client", () => {
     const { apiLogin, setUnauthorizedHandler } = await import("@/lib/api")
     setUnauthorizedHandler(null)
 
-    fetchMock.mockResolvedValue({
+    ;(
+      fetchMock as unknown as {
+        mockResolvedValue: (value: FetchMockResolved) => void
+      }
+    ).mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({

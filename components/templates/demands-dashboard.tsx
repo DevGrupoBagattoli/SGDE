@@ -32,6 +32,7 @@ import {
 import {
   Demand,
   DemandStatus,
+  matchesTechnicianDashboardFilter,
   statusLabels,
   type SummaryDetailSegment,
 } from "@/lib/demands"
@@ -115,17 +116,20 @@ export function DemandsDashboard() {
   }, [availableTechnicians, demands])
 
   const filteredDemands = useMemo(() => {
+    const role = session?.role === "eletricista" ? "eletricista" : "gestor"
     const visibleDemands =
       selectedTechnician === "Todos"
         ? demands
-        : demands.filter((demand) => demand.tecnico === selectedTechnician)
+        : demands.filter((demand) =>
+            matchesTechnicianDashboardFilter(demand, selectedTechnician, role)
+          )
 
     return [...visibleDemands].sort(
       (first, second) =>
         new Date(first.horarioInicio).getTime() -
         new Date(second.horarioInicio).getTime()
     )
-  }, [demands, selectedTechnician])
+  }, [demands, selectedTechnician, session?.role])
 
   const statusTotals = useMemo(
     () =>
@@ -362,6 +366,7 @@ export function DemandsDashboard() {
                 isTechnicianFilterLocked={isElectrician}
                 selectedDateKey={selectedDateKey}
                 selectedTechnician={selectedTechnician}
+                technicianFilterRole={isElectrician ? "eletricista" : "gestor"}
                 technicians={selectableTechnicians}
                 showCreateButton={isManager}
                 onChangeMonth={handleChangeMonth}
@@ -401,6 +406,7 @@ export function DemandsDashboard() {
               isTechnicianFilterLocked={isElectrician}
               selectedDateKey={selectedDateKey}
               selectedTechnician={selectedTechnician}
+              technicianFilterRole={isElectrician ? "eletricista" : "gestor"}
               technicians={selectableTechnicians}
               showCreateButton={isManager}
               onChangeMonth={handleChangeMonth}

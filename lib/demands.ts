@@ -21,6 +21,24 @@ export type Demand = {
   dateKeys: string[]
 }
 
+/** Gestor filtra pelo técnico responsável; eletricista vê demandas onde é responsável ou participante. */
+export type DashboardTechnicianFilterRole = "gestor" | "eletricista"
+
+export const matchesTechnicianDashboardFilter = (
+  demand: Demand,
+  selectedTechnician: string,
+  role: DashboardTechnicianFilterRole
+) => {
+  if (selectedTechnician === "Todos") return true
+  if (role === "eletricista") {
+    return (
+      demand.tecnico === selectedTechnician ||
+      demand.participantes.includes(selectedTechnician)
+    )
+  }
+  return demand.tecnico === selectedTechnician
+}
+
 export const parseDurationDisplayMinutes = (value: string): number | null => {
   const match = value.match(/^(\d{2}):(\d{2})h$/)
   if (!match) return null

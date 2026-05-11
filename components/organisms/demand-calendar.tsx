@@ -12,7 +12,11 @@ import {
   monthFormatter,
   weekdayLabels,
 } from "@/lib/calendar"
-import { Demand } from "@/lib/demands"
+import {
+  Demand,
+  matchesTechnicianDashboardFilter,
+  type DashboardTechnicianFilterRole,
+} from "@/lib/demands"
 import { cn } from "@/lib/utils"
 
 type CalendarDay = {
@@ -125,6 +129,7 @@ type DemandCalendarProps = {
   isTechnicianFilterLocked?: boolean
   selectedDateKey: string
   selectedTechnician: string
+  technicianFilterRole?: DashboardTechnicianFilterRole
   technicians: string[]
   onChangeMonth: (direction: -1 | 1) => void
   onChangeTechnician: (technician: string) => void
@@ -141,6 +146,7 @@ export function DemandCalendar({
   isTechnicianFilterLocked = false,
   selectedDateKey,
   selectedTechnician,
+  technicianFilterRole = "gestor",
   technicians,
   onChangeMonth,
   onChangeTechnician,
@@ -167,13 +173,19 @@ export function DemandCalendar({
     const filtered =
       selectedTechnician === "Todos"
         ? dayDemands
-        : dayDemands.filter((d) => d.tecnico === selectedTechnician)
+        : dayDemands.filter((d) =>
+            matchesTechnicianDashboardFilter(
+              d,
+              selectedTechnician,
+              technicianFilterRole
+            )
+          )
     return [...filtered].sort(
       (a, b) =>
         new Date(a.horarioInicio).getTime() -
         new Date(b.horarioInicio).getTime(),
     )
-  }, [demandsByDate, selectedDateKey, selectedTechnician])
+  }, [demandsByDate, selectedDateKey, selectedTechnician, technicianFilterRole])
 
   const monthDaysForStrip = useMemo(
     () => calendarDays.filter((d) => d.isCurrentMonth),
