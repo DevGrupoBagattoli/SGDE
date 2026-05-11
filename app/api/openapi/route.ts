@@ -11,6 +11,15 @@ const openApiV1 = {
     "/api/auth/me": { get: { summary: "Sessão atual" } },
     "/api/auth/refresh": { post: { summary: "Refresh de sessão" } },
     "/api/auth/logout": { post: { summary: "Logout" } },
+    "/api/users": {
+      get: { summary: "Listar usuários" },
+      post: { summary: "Criar usuário" },
+    },
+    "/api/users/{id}": {
+      get: { summary: "Detalhar usuário" },
+      patch: { summary: "Atualizar usuário" },
+      delete: { summary: "Deletar usuário" },
+    },
     "/api/demands": {
       get: { summary: "Listar demandas" },
       post: { summary: "Criar demanda" },

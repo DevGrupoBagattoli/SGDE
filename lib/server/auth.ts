@@ -152,6 +152,22 @@ export const requireAuth = async () => {
   }
 }
 
+export const requireManager = async () => {
+  const auth = await requireAuth()
+
+  if (auth.error) {
+    return auth
+  }
+
+  if (auth.user.role !== UserRole.MANAGER) {
+    return {
+      error: jsonError(403, "FORBIDDEN", "Acesso permitido somente para gestores"),
+    }
+  }
+
+  return auth
+}
+
 export const canViewDemand = (user: User, demand: {
   technicianId: string
   participants: Array<{ userId: string }>
