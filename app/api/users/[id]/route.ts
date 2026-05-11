@@ -1,4 +1,4 @@
-import { jsonError, jsonOk } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 import {
   apiRoleToDb,
@@ -36,7 +36,9 @@ export async function GET(_: Request, { params }: RouteParams) {
   })
 
   if (!user) {
-    return jsonError(404, "NOT_FOUND", "Usuário não encontrado")
+    return jsonError(404, "NOT_FOUND", "Usuário não encontrado para o identificador informado", {
+      userId: id,
+    })
   }
 
   return jsonOk({
@@ -62,7 +64,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const parsed = updateUserSchema.safeParse(payload)
 
   if (!parsed.success) {
-    return jsonError(422, "UNPROCESSABLE", "Payload inválido", parsed.error.flatten())
+    return jsonValidationError("Valores inválido", parsed.error.flatten())
   }
 
   const existingUser = await prisma.user.findUnique({
@@ -74,7 +76,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   })
 
   if (!existingUser) {
-    return jsonError(404, "NOT_FOUND", "Usuário não encontrado")
+    return jsonError(404, "NOT_FOUND", "Usuário não encontrado para o identificador informado", {
+      userId: id,
+    })
   }
 
   if (
@@ -82,7 +86,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     parsed.data.role &&
     parsed.data.role !== "gestor"
   ) {
-    return jsonError(409, "CONFLICT", "O gestor autenticado não pode remover seu próprio acesso")
+    return jsonError(
+      409,
+      "CONFLICT",
+      "Não é permitido rebaixar o próprio usuário autenticado de gestor para eletricista",
+      {
+        userId: auth.user.id,
+        attemptedRole: parsed.data.role,
+      }
+    )
   }
 
   try {
@@ -109,7 +121,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     })
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      return jsonError(409, "CONFLICT", "Já existe um usuário com este nome")
+      return jsonError(409, "CONFLICT", "Já existe um usuário com este nome", {
+        field: "name",
+        value: parsed.data.name,
+        hint: "Informe um nome de usuário diferente",
+      })
     }
 
     throw error
@@ -132,7 +148,10 @@ export async function DELETE(_: Request, { params }: RouteParams) {
   const { id } = await params
 
   if (id === auth.user.id) {
-    return jsonError(409, "CONFLICT", "O gestor autenticado não pode deletar a si mesmo")
+    return jsonError(409, "CONFLICT", "Não é permitido deletar o próprio usuário autenticado", {
+      userId: auth.user.id,
+      reason: "A ação removeria o único contexto autenticado atual",
+    })
   }
 
   const existingUser = await prisma.user.findUnique({
@@ -147,7 +166,9 @@ export async function DELETE(_: Request, { params }: RouteParams) {
   })
 
   if (!existingUser) {
-    return jsonError(404, "NOT_FOUND", "Usuário não encontrado")
+    return jsonError(404, "NOT_FOUND", "Usuário não encontrado para o identificador informado", {
+      userId: id,
+    })
   }
 
   try {
@@ -159,7 +180,11 @@ export async function DELETE(_: Request, { params }: RouteParams) {
       return jsonError(
         409,
         "CONFLICT",
-        "Não é possível deletar um usuário vinculado a demandas, auditorias ou outras relações"
+        "Não é possível deletar um usuário vinculado a demandas, auditorias ou outras relações",
+        {
+          userId: id,
+          hint: "Remova ou transfira os vínculos existentes antes de tentar novamente",
+        }
       )
     }
 

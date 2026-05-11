@@ -23,11 +23,17 @@ export async function GET(_: Request, { params }: RouteParams) {
   })
 
   if (!demand) {
-    return jsonError(404, "NOT_FOUND", "Demanda não encontrada")
+    return jsonError(404, "NOT_FOUND", "Demanda não encontrada para o identificador informado", {
+      demandId: id,
+    })
   }
 
   if (!canViewDemand(auth.user, demand)) {
-    return jsonError(403, "FORBIDDEN", "Sem permissão para visualizar esta demanda")
+    return jsonError(403, "FORBIDDEN", "Usuário autenticado sem permissão para visualizar esta demanda", {
+      demandId: id,
+      userId: auth.user.id,
+      reason: "A demanda não pertence ao usuário e não há privilégio de gestor",
+    })
   }
 
   const history = await prisma.demandAudit.findMany({

@@ -1,4 +1,4 @@
-import { jsonError, jsonOk } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 import {
   createUserSchema,
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const parsed = createUserSchema.safeParse(payload)
 
   if (!parsed.success) {
-    return jsonError(422, "UNPROCESSABLE", "Payload inválido", parsed.error.flatten())
+    return jsonValidationError("Valores inválido", parsed.error.flatten())
   }
 
   try {
@@ -74,7 +74,11 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      return jsonError(409, "CONFLICT", "Já existe um usuário com este nome")
+      return jsonError(409, "CONFLICT", "Já existe um usuário com este nome", {
+        field: "name",
+        value: parsed.data.name,
+        hint: "Informe um nome de usuário diferente",
+      })
     }
 
     throw error

@@ -10,7 +10,7 @@ import {
   parseCreateDemandData,
   toDemandDto,
 } from "@/lib/server/demands"
-import { jsonError, jsonOk } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 const querySchema = z.object({
@@ -41,7 +41,10 @@ export async function GET(request: Request) {
   })
 
   if (!queryParsed.success) {
-    return jsonError(422, "UNPROCESSABLE", "Parâmetros inválidos", queryParsed.error.flatten())
+    return jsonValidationError(
+      "Valores inválido nos parâmetros de consulta",
+      queryParsed.error.flatten()
+    )
   }
 
   const where = demandsWhereForUser(auth.user)
@@ -130,14 +133,17 @@ export async function POST(request: Request) {
   }
 
   if (auth.user.role !== UserRole.MANAGER) {
-    return jsonError(403, "FORBIDDEN", "Somente gestores podem criar demandas")
+    return jsonError(403, "FORBIDDEN", "Apenas usuários com perfil de gestor podem criar demandas", {
+      role: auth.user.role,
+      requiredRole: UserRole.MANAGER,
+    })
   }
 
   const payload = await request.json().catch(() => null)
   const parsed = createDemandSchema.safeParse(payload)
 
   if (!parsed.success) {
-    return jsonError(422, "UNPROCESSABLE", "Payload inválido", parsed.error.flatten())
+    return jsonValidationError("Valores inválido", parsed.error.flatten())
   }
 
   const technician = await prisma.user.findUnique({
@@ -145,7 +151,10 @@ export async function POST(request: Request) {
   })
 
   if (!technician || technician.role !== UserRole.ELECTRICIAN) {
-    return jsonError(422, "UNPROCESSABLE", "Técnico inválido")
+    return jsonError(422, "UNPROCESSABLE", "Técnico inválido ou inexistente para a demanda informada", {
+      tecnico: parsed.data.tecnico,
+      reason: "O usuário informado não foi encontrado ou não possui perfil de eletricista",
+    })
   }
 
   const participants = await prisma.user.findMany({
@@ -162,7 +171,11 @@ export async function POST(request: Request) {
   try {
     parsedDate = parseCreateDemandData(parsed.data)
   } catch (error) {
-    return jsonError(422, "UNPROCESSABLE", error instanceof Error ? error.message : "Dados inválidos")
+    const message = error instanceof Error ? error.message : "Dados inválidos"
+    return jsonError(422, "UNPROCESSABLE", `Não foi possível interpretar os dados de agenda: ${message}`, {
+      reason: message,
+      fields: ["horarioInicio", "duracaoPrevista", "status", "observacoes"],
+    })
   }
 
   const created = await prisma.demand.create({

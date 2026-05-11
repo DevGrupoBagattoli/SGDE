@@ -142,7 +142,9 @@ export const requireAuth = async () => {
 
   if (!auth) {
     return {
-      error: jsonError(401, "UNAUTHORIZED", "Sessão inválida ou expirada"),
+      error: jsonError(401, "UNAUTHORIZED", "Sessão inválida ou expirada; faça login novamente", {
+        reason: "Access token ausente, expirado ou revogado",
+      }),
     }
   }
 
@@ -161,7 +163,15 @@ export const requireManager = async () => {
 
   if (auth.user.role !== UserRole.MANAGER) {
     return {
-      error: jsonError(403, "FORBIDDEN", "Acesso permitido somente para gestores"),
+      error: jsonError(
+        403,
+        "FORBIDDEN",
+        "Acesso permitido somente para gestores",
+        {
+          requiredRole: UserRole.MANAGER,
+          actualRole: auth.user.role,
+        }
+      ),
     }
   }
 
@@ -196,7 +206,11 @@ export const rotateRefreshSession = async () => {
   const refreshToken = cookieStore.get(REFRESH_COOKIE_NAME)?.value
 
   if (!refreshToken) {
-    return { error: jsonError(401, "UNAUTHORIZED", "Refresh token ausente") }
+    return {
+      error: jsonError(401, "UNAUTHORIZED", "Refresh token ausente; não foi possível renovar a sessão", {
+        reason: "Cookie de refresh não encontrado",
+      }),
+    }
   }
 
   const current = await prisma.session.findFirst({
@@ -211,7 +225,11 @@ export const rotateRefreshSession = async () => {
   })
 
   if (!current) {
-    return { error: jsonError(401, "UNAUTHORIZED", "Refresh token inválido") }
+    return {
+      error: jsonError(401, "UNAUTHORIZED", "Refresh token inválido ou expirado; faça login novamente", {
+        reason: "Token não encontrado, revogado ou com validade expirada",
+      }),
+    }
   }
 
   await prisma.session.update({

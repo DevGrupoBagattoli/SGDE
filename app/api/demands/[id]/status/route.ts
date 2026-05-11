@@ -4,7 +4,7 @@ import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
 import { toDemandDto, updateStatusSchema, demandStatusToDb } from "@/lib/server/demands"
-import { jsonError, jsonOk } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 type RouteParams = {
@@ -30,7 +30,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const parsed = updateStatusSchema.safeParse(payload)
 
   if (!parsed.success) {
-    return jsonError(422, "UNPROCESSABLE", "Payload inválido", parsed.error.flatten())
+    return jsonValidationError("Valores inválido", parsed.error.flatten())
   }
 
   const demand = await prisma.demand.findUnique({
@@ -42,22 +42,35 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   })
 
   if (!demand) {
-    return jsonError(404, "NOT_FOUND", "Demanda não encontrada")
+    return jsonError(404, "NOT_FOUND", "Demanda não encontrada para o identificador informado", {
+      demandId: id,
+    })
   }
 
   if (!canEditDemand(auth.user, demand)) {
-    return jsonError(403, "FORBIDDEN", "Sem permissão para editar esta demanda")
+    return jsonError(403, "FORBIDDEN", "Usuário autenticado sem permissão para editar esta demanda", {
+      demandId: id,
+      userId: auth.user.id,
+      reason: "Somente gestor, técnico responsável ou regras de edição aplicáveis podem editar",
+    })
   }
 
   if (
     auth.user.role === UserRole.ELECTRICIAN &&
     demand.technicianId !== auth.user.id
   ) {
-    return jsonError(403, "FORBIDDEN", "Participantes possuem acesso somente de visualização")
+    return jsonError(403, "FORBIDDEN", "Participantes possuem acesso somente de visualização para esta demanda", {
+      demandId: id,
+      userId: auth.user.id,
+      technicianId: demand.technicianId,
+    })
   }
 
   if (parsed.data.version !== demand.version) {
-    return jsonError(409, "CONFLICT", "Versão desatualizada da demanda")
+    return jsonError(409, "CONFLICT", "Versão desatualizada da demanda; atualize os dados antes de salvar", {
+      sentVersion: parsed.data.version,
+      currentVersion: demand.version,
+    })
   }
 
   const nextStatus = demandStatusToDb(parsed.data.status)

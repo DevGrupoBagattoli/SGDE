@@ -12,7 +12,11 @@ export const validateCsrf = async () => {
   const csrfHeader = headersStore.get("x-csrf-token")
 
   if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
-    return jsonError(403, "FORBIDDEN", "Falha na validação de CSRF")
+    return jsonError(403, "FORBIDDEN", "Falha na validação de CSRF; atualize a página e tente novamente", {
+      hasCsrfCookie: Boolean(csrfCookie),
+      hasCsrfHeader: Boolean(csrfHeader),
+      reason: "Token CSRF ausente ou divergente entre cookie e header",
+    })
   }
 
   return null
