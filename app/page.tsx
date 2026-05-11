@@ -1,5 +1,5 @@
-import { DemandsDashboard } from "@/components/templates/demands-dashboard"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return <DemandsDashboard />
+  redirect("/dashboard")
 }

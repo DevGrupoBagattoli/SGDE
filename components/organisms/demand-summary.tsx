@@ -1,6 +1,7 @@
 import { MetricCard } from "@/components/atoms/metric-card"
 import {
   DemandStatus,
+  type SummaryDetailSegment,
   statusLabels,
   statusStyles,
   totalMetricIcon,
@@ -12,15 +13,25 @@ type DemandSummaryProps = {
     total: number
   }>
   totalDemands: number
+  /** Abre o modal de detalhes ao tocar em cada card. */
+  onSelectSegment?: (segment: SummaryDetailSegment) => void
 }
 
 export function DemandSummary({
   statusTotals,
   totalDemands,
+  onSelectSegment,
 }: DemandSummaryProps) {
   return (
     <section className="grid gap-3 md:grid-cols-4">
-      <MetricCard icon={totalMetricIcon} label="Total" value={totalDemands} />
+      <MetricCard
+        icon={totalMetricIcon}
+        label="Total"
+        value={totalDemands}
+        onPress={
+          onSelectSegment ? () => onSelectSegment("total") : undefined
+        }
+      />
       {statusLabels.map((status) => {
         const total =
           statusTotals.find((statusTotal) => statusTotal.status === status)
@@ -36,6 +47,9 @@ export function DemandSummary({
             key={status}
             label={status}
             value={total}
+            onPress={
+              onSelectSegment ? () => onSelectSegment(status) : undefined
+            }
           />
         )
       })}

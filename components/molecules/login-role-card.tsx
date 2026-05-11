@@ -4,6 +4,7 @@ import { FormEvent, ReactNode } from "react"
 import { type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 type LoginRoleCardProps = {
   children: ReactNode
@@ -21,27 +22,30 @@ export function LoginRoleCard({
   onSubmit,
 }: LoginRoleCardProps) {
   return (
-    <form
-      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-6"
-      onSubmit={onSubmit}
-    >
-      <div className="flex items-start gap-3">
-        <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white">
-          <Icon className="size-5" />
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">
-            {description}
-          </p>
-        </div>
-      </div>
+    <Card className="rounded-3xl shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <form onSubmit={onSubmit}>
+        <CardHeader className="flex flex-row items-start gap-3 space-y-0 p-5 sm:p-6 pb-0 sm:pb-0">
+          <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white">
+            <Icon className="size-5" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <CardTitle className="text-xl font-semibold text-slate-950">{title}</CardTitle>
+            <CardDescription className="text-sm leading-6 text-slate-500">
+              {description}
+            </CardDescription>
+          </div>
+        </CardHeader>
 
-      <div className="mt-6 grid gap-4">{children}</div>
+        <CardContent className="p-5 sm:p-6 pb-0 sm:pb-0">
+          <div className="mt-6 grid gap-4">{children}</div>
+        </CardContent>
 
-      <Button className="mt-6 w-full" size="lg" type="submit">
-        Entrar como {title.toLowerCase()}
-      </Button>
-    </form>
+        <CardFooter className="p-5 sm:p-6">
+          <Button className="mt-6 w-full" size="lg" type="submit">
+            Entrar como {title.toLowerCase()}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
   )
 }

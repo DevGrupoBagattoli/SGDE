@@ -1,40 +1,104 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { CreateDemandModal } from "@/components/organisms/create-demand-modal"
+import {
+  DashboardMobileSidebar,
+  type DashboardMobileMainView,
+} from "@/components/organisms/dashboard-mobile-sidebar"
 import { DashboardHero } from "@/components/organisms/dashboard-hero"
 import { DaySchedulePanel } from "@/components/organisms/day-schedule-panel"
 import { DemandCalendar } from "@/components/organisms/demand-calendar"
 import { DemandDetailsList } from "@/components/organisms/demand-details-list"
 import { DemandSummary } from "@/components/organisms/demand-summary"
-import { LoginScreen } from "@/components/organisms/login-screen"
+import { DemandSummaryDetailModal } from "@/components/organisms/demand-summary-detail-modal"
 import { ScheduleEditModal } from "@/components/organisms/schedule-edit-modal"
+import { useSession } from "@/hooks/use-session"
 import {
   buildCalendarDays,
+  enumerateDateKeysLocal,
   getDateKey,
   toDateTimeLocalValue,
 } from "@/lib/calendar"
-import { UserSession } from "@/lib/auth"
-import { Demand, DemandStatus, mockDemands, statusLabels } from "@/lib/demands"
+import {
+  apiCreateDemand,
+  apiGetDemands,
+  apiGetTechnicians,
+  apiUpdateSchedule,
+  apiUpdateStatus,
+} from "@/lib/api"
+import {
+  Demand,
+  DemandStatus,
+  matchesTechnicianDashboardFilter,
+  statusLabels,
+  type SummaryDetailSegment,
+} from "@/lib/demands"
 
 export function DemandsDashboard() {
-  const [session, setSession] = useState<UserSession | null>(null)
-  const [demands, setDemands] = useState<Demand[]>(() => mockDemands)
+  const router = useRouter()
+  const { session, status, logout } = useSession()
+
+  const [demands, setDemands] = useState<Demand[]>([])
+  const [availableTechnicians, setAvailableTechnicians] = useState<string[]>([])
+  const [isBooting, setIsBooting] = useState(true)
+  const [globalError, setGlobalError] = useState("")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedTechnician, setSelectedTechnician] = useState("Todos")
   const [editingDemand, setEditingDemand] = useState<Demand | null>(null)
   const [scheduleValue, setScheduleValue] = useState("")
   const [observationValue, setObservationValue] = useState("")
   const [scheduleError, setScheduleError] = useState("")
-  const [currentMonth, setCurrentMonth] = useState(
-    () => new Date(2026, 3, 1)
-  )
-  const [selectedDate, setSelectedDate] = useState(() => new Date(2026, 3, 30))
+  const [requestWarning, setRequestWarning] = useState("")
+  const [summarySegment, setSummarySegment] =
+    useState<SummaryDetailSegment | null>(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [mobileMainView, setMobileMainView] =
+    useState<DashboardMobileMainView>("day")
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
+  const [selectedDate, setSelectedDate] = useState(() => new Date())
 
   useEffect(() => {
-    // TODO: Integrar com API GET para carregar demandas iniciais.
-  }, [])
+    if (status === "unauthenticated") {
+      router.replace("/login")
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session) return
+
+    const bootstrap = async () => {
+      try {
+        const technicians = await apiGetTechnicians()
+        setAvailableTechnicians(technicians.map((technician) => technician.name))
+      } catch {
+        setAvailableTechnicians([])
+      }
+
+      try {
+        const loadedDemands = await apiGetDemands()
+        setDemands(loadedDemands)
+
+        if (session.role === "eletricista") {
+          setSelectedTechnician(session.name)
+          const today = new Date()
+          setSelectedDate(today)
+          setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
+        }
+      } catch {
+        setDemands([])
+      } finally {
+        setIsBooting(false)
+      }
+    }
+
+    void bootstrap()
+  }, [status, session])
 
   const technicians = useMemo(
     () => [
@@ -44,33 +108,44 @@ export function DemandsDashboard() {
     [demands]
   )
 
-  const technicianOptions = useMemo(
-    () => Array.from(new Set(demands.map((demand) => demand.tecnico))),
-    [demands]
-  )
+  const technicianOptions = useMemo(() => {
+    const fromDemands = Array.from(new Set(demands.map((demand) => demand.tecnico)))
+    const fromAuthList = availableTechnicians
+
+    return Array.from(new Set([...fromDemands, ...fromAuthList]))
+  }, [availableTechnicians, demands])
 
   const filteredDemands = useMemo(() => {
+    const role = session?.role === "eletricista" ? "eletricista" : "gestor"
     const visibleDemands =
       selectedTechnician === "Todos"
         ? demands
-        : demands.filter((demand) => demand.tecnico === selectedTechnician)
+        : demands.filter((demand) =>
+            matchesTechnicianDashboardFilter(demand, selectedTechnician, role)
+          )
 
     return [...visibleDemands].sort(
       (first, second) =>
         new Date(first.horarioInicio).getTime() -
         new Date(second.horarioInicio).getTime()
     )
-  }, [demands, selectedTechnician])
+  }, [demands, selectedTechnician, session?.role])
 
   const statusTotals = useMemo(
     () =>
-      statusLabels.map((status) => ({
-        status,
-        total: filteredDemands.filter((demand) => demand.status === status)
+      statusLabels.map((statusLabel) => ({
+        status: statusLabel,
+        total: filteredDemands.filter((demand) => demand.status === statusLabel)
           .length,
       })),
     [filteredDemands]
   )
+
+  const summaryModalDemands = useMemo(() => {
+    if (!summarySegment) return []
+    if (summarySegment === "total") return filteredDemands
+    return filteredDemands.filter((d) => d.status === summarySegment)
+  }, [filteredDemands, summarySegment])
 
   const calendarDays = useMemo(
     () => buildCalendarDays(currentMonth),
@@ -79,8 +154,15 @@ export function DemandsDashboard() {
 
   const demandsByDate = useMemo(() => {
     return filteredDemands.reduce<Record<string, Demand[]>>((acc, demand) => {
-      const dateKey = getDateKey(new Date(demand.horarioInicio))
-      acc[dateKey] = [...(acc[dateKey] ?? []), demand]
+      const keys = enumerateDateKeysLocal(
+        new Date(demand.horarioInicio),
+        new Date(demand.horarioFim),
+      )
+
+      keys.forEach((dateKey) => {
+        acc[dateKey] = [...(acc[dateKey] ?? []), demand]
+      })
+
       return acc
     }, {})
   }, [filteredDemands])
@@ -89,59 +171,92 @@ export function DemandsDashboard() {
   const selectedDayDemands = demandsByDate[selectedDateKey] ?? []
 
   const handleChangeMonth = (direction: -1 | 1) => {
-    setCurrentMonth(
-      (month) => new Date(month.getFullYear(), month.getMonth() + direction, 1)
+    const nextMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() + direction,
+      1
     )
-  }
-
-  const handleUpdateStatus = (id: string, status: DemandStatus) => {
-    // TODO: Integrar com API POST/PATCH.
-    setDemands((currentDemands) =>
-      currentDemands.map((demand) =>
-        demand.id === id ? { ...demand, status } : demand
-      )
-    )
-  }
-
-  const handleCreateDemand = (newDemand: Omit<Demand, "id">) => {
-    const createdDemand: Demand = {
-      ...newDemand,
-      id: crypto.randomUUID(),
-    }
-    const createdAt = new Date(createdDemand.horarioInicio)
-
-    // TODO: Integrar com API POST para criar chamado.
-    setDemands((currentDemands) => [...currentDemands, createdDemand])
-    setSelectedDate(createdAt)
-    setCurrentMonth(new Date(createdAt.getFullYear(), createdAt.getMonth(), 1))
-
-    if (session?.role === "gestor" && selectedTechnician !== "Todos") {
-      setSelectedTechnician(createdDemand.tecnico)
-    }
-
-    setIsCreateModalOpen(false)
-  }
-
-  const handleLogin = (nextSession: UserSession) => {
-    setSession(nextSession)
-    setEditingDemand(null)
-
-    if (nextSession.role === "eletricista") {
-      setSelectedTechnician(nextSession.name)
+    setCurrentMonth(nextMonth)
+    setSelectedDate((prev) => {
+      if (
+        prev.getFullYear() === nextMonth.getFullYear() &&
+        prev.getMonth() === nextMonth.getMonth()
+      ) {
+        return prev
+      }
       const today = new Date()
-      setSelectedDate(today)
-      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
+      if (
+        today.getFullYear() === nextMonth.getFullYear() &&
+        today.getMonth() === nextMonth.getMonth()
+      ) {
+        return new Date(today)
+      }
+      return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1)
+    })
+  }
 
+  const handleUpdateStatus = async (id: string, newStatus: DemandStatus) => {
+    setGlobalError("")
+    setRequestWarning("")
+
+    const currentDemand = demands.find((demand) => demand.id === id)
+
+    if (!currentDemand) {
       return
     }
 
-    setSelectedTechnician("Todos")
+    try {
+      const response = await apiUpdateStatus(id, newStatus, currentDemand.version)
+
+      setDemands((currentDemands) =>
+        currentDemands.map((demand) =>
+          demand.id === id ? response.data.demand : demand
+        )
+      )
+
+      if (response.warnings.length > 0) {
+        setRequestWarning(response.warnings[0].message)
+      }
+    } catch (error) {
+      setGlobalError(
+        error instanceof Error ? error.message : "Falha ao atualizar status"
+      )
+    }
+  }
+
+  const handleCreateDemand = async (
+    newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">
+  ) => {
+    setGlobalError("")
+    setRequestWarning("")
+
+    try {
+      const response = await apiCreateDemand(newDemand)
+      const createdDemand = response.data.demand
+      const createdAt = new Date(createdDemand.horarioInicio)
+
+      setDemands((currentDemands) => [...currentDemands, createdDemand])
+      setSelectedDate(createdAt)
+      setCurrentMonth(new Date(createdAt.getFullYear(), createdAt.getMonth(), 1))
+
+      if (session?.role === "gestor" && selectedTechnician !== "Todos") {
+        setSelectedTechnician(createdDemand.tecnico)
+      }
+
+      if (response.warnings.length > 0) {
+        setRequestWarning(response.warnings[0].message)
+      }
+
+      setIsCreateModalOpen(false)
+    } catch (error) {
+      setGlobalError(
+        error instanceof Error ? error.message : "Falha ao criar demanda"
+      )
+    }
   }
 
   const handleLogout = () => {
-    setSession(null)
-    setSelectedTechnician("Todos")
-    setEditingDemand(null)
+    void logout()
   }
 
   const handleOpenScheduleEditor = (demand: Demand) => {
@@ -151,7 +266,7 @@ export function DemandsDashboard() {
     setScheduleError("")
   }
 
-  const handleUpdateSchedule = (
+  const handleUpdateSchedule = async (
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string
@@ -163,108 +278,148 @@ export function DemandsDashboard() {
     }
 
     const nextSchedule = new Date(scheduleValue).toISOString()
-    const scheduleChanged = nextSchedule !== editingDemand.horarioInicio
+    const durationMinutes = parseDurationDisplayMinutes(duracaoPrevista)
+    const nextEndTime = durationMinutes
+      ? new Date(new Date(scheduleValue).getTime() + durationMinutes * 60_000).toISOString()
+      : editingDemand.horarioFim
 
-    if (scheduleChanged && !observationValue.trim()) {
+    const scheduleChanged = nextSchedule !== editingDemand.horarioInicio
+    const durationChanged = nextEndTime !== editingDemand.horarioFim
+
+    if ((scheduleChanged || durationChanged) && !observationValue.trim()) {
       setScheduleError(
-        "Informe uma observação para justificar a alteração de dia ou horário."
+        "Informe uma observação para justificar a alteração de dia, horário ou duração."
       )
       return
     }
 
-    // TODO: Integrar com API POST/PATCH.
-    setDemands((currentDemands) =>
-      currentDemands.map((demand) =>
-        demand.id === editingDemand.id
-          ? {
-              ...demand,
-              horarioInicio: nextSchedule,
-              observacoes: observationValue.trim(),
-              participantes,
-              duracaoPrevista,
-            }
-          : demand
+    try {
+      const response = await apiUpdateSchedule(editingDemand.id, {
+        horarioInicio: nextSchedule,
+        duracaoPrevista,
+        observacoes: observationValue.trim(),
+        participantes,
+        version: editingDemand.version,
+      })
+
+      setDemands((currentDemands) =>
+        currentDemands.map((demand) =>
+          demand.id === editingDemand.id ? response.data.demand : demand
+        )
       )
-    )
-    setEditingDemand(null)
+
+      if (response.warnings.length > 0) {
+        setRequestWarning(response.warnings[0].message)
+      } else {
+        setRequestWarning("")
+      }
+
+      setEditingDemand(null)
+    } catch (error) {
+      setScheduleError(
+        error instanceof Error ? error.message : "Falha ao atualizar agenda"
+      )
+    }
   }
 
-  if (!session) {
-    return <LoginScreen technicians={technicianOptions} onLogin={handleLogin} />
+  if (status === "loading" || status === "unauthenticated" || isBooting || !session) {
+    return (
+      <main className="grid min-h-svh place-items-center bg-slate-100 text-slate-700">
+        Carregando SGDE...
+      </main>
+    )
   }
 
   const isElectrician = session.role === "eletricista"
   const isManager = session.role === "gestor"
-  const availableTechnicians = isElectrician ? [session.name] : technicians
+  const selectableTechnicians = isElectrician ? [session.name] : technicians
 
   return (
     <main className="min-h-svh bg-slate-100 text-slate-950">
       <DashboardHero
-        isManager={isManager}
         session={session}
+        onMenuOpen={() => setMobileNavOpen(true)}
+      />
+
+      <DashboardMobileSidebar
+        layout="demands"
+        isManager={isManager}
         totalDemands={filteredDemands.length}
-        onCreateDemand={() => {
-          if (!isManager) return
-          setIsCreateModalOpen(true)
-        }}
+        open={mobileNavOpen}
+        view={mobileMainView}
+        onOpenChange={setMobileNavOpen}
         onLogout={handleLogout}
+        onViewChange={setMobileMainView}
       />
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        {isElectrician ? (
-          <>
-            <div className="md:hidden">
-              <DaySchedulePanel
-                demands={selectedDayDemands}
-                selectedDate={selectedDate}
-                onSelectDemand={handleOpenScheduleEditor}
-              />
-            </div>
-
-            <div className="hidden flex-col gap-6 md:flex">
-              <DemandSummary
-                statusTotals={statusTotals}
-                totalDemands={filteredDemands.length}
-              />
+        {globalError ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {globalError}
+          </div>
+        ) : null}
+        {requestWarning ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+            {requestWarning}
+          </div>
+        ) : null}
+        <>
+          <div className="flex flex-col gap-4 md:hidden">
+            {mobileMainView === "day" ? (
               <DemandCalendar
                 calendarDays={calendarDays}
                 currentMonth={currentMonth}
                 demandsByDate={demandsByDate}
-                isTechnicianFilterLocked
+                isTechnicianFilterLocked={isElectrician}
                 selectedDateKey={selectedDateKey}
                 selectedTechnician={selectedTechnician}
-                technicians={availableTechnicians}
+                technicianFilterRole={isElectrician ? "eletricista" : "gestor"}
+                technicians={selectableTechnicians}
+                showCreateButton={isManager}
                 onChangeMonth={handleChangeMonth}
                 onChangeTechnician={setSelectedTechnician}
+                onCreateDemand={
+                  isManager ? () => setIsCreateModalOpen(true) : undefined
+                }
                 onSelectDate={setSelectedDate}
                 onSelectDemand={handleOpenScheduleEditor}
               />
-              <DaySchedulePanel
-                demands={selectedDayDemands}
-                selectedDate={selectedDate}
-                onSelectDemand={handleOpenScheduleEditor}
-              />
-              <DemandDetailsList
-                demands={filteredDemands}
-                onEditSchedule={handleOpenScheduleEditor}
-                onUpdateStatus={handleUpdateStatus}
-              />
-            </div>
-          </>
-        ) : (
-          <>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <DemandSummary
+                  statusTotals={statusTotals}
+                  totalDemands={filteredDemands.length}
+                  onSelectSegment={setSummarySegment}
+                />
+                <DemandDetailsList
+                  demands={filteredDemands}
+                  onEditSchedule={handleOpenScheduleEditor}
+                  onUpdateStatus={handleUpdateStatus}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="hidden flex-col gap-6 md:flex">
             <DemandSummary
               statusTotals={statusTotals}
               totalDemands={filteredDemands.length}
+              onSelectSegment={setSummarySegment}
             />
             <DemandCalendar
               calendarDays={calendarDays}
               currentMonth={currentMonth}
               demandsByDate={demandsByDate}
+              isTechnicianFilterLocked={isElectrician}
               selectedDateKey={selectedDateKey}
               selectedTechnician={selectedTechnician}
-              technicians={availableTechnicians}
+              technicianFilterRole={isElectrician ? "eletricista" : "gestor"}
+              technicians={selectableTechnicians}
+              showCreateButton={isManager}
               onChangeMonth={handleChangeMonth}
               onChangeTechnician={setSelectedTechnician}
+              onCreateDemand={
+                isManager ? () => setIsCreateModalOpen(true) : undefined
+              }
               onSelectDate={setSelectedDate}
               onSelectDemand={handleOpenScheduleEditor}
             />
@@ -278,8 +433,8 @@ export function DemandsDashboard() {
               onEditSchedule={handleOpenScheduleEditor}
               onUpdateStatus={handleUpdateStatus}
             />
-          </>
-        )}
+          </div>
+        </>
       </section>
 
       {editingDemand ? (
@@ -311,6 +466,15 @@ export function DemandsDashboard() {
           onCreate={handleCreateDemand}
         />
       ) : null}
+
+      <DemandSummaryDetailModal
+        demands={summaryModalDemands}
+        segment={summarySegment}
+        onEditSchedule={handleOpenScheduleEditor}
+        onOpenChange={(open) => {
+          if (!open) setSummarySegment(null)
+        }}
+      />
     </main>
   )
 }

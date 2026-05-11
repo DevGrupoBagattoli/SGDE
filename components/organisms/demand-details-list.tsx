@@ -6,7 +6,7 @@ import { Demand, DemandStatus } from "@/lib/demands"
 type DemandDetailsListProps = {
   demands: Demand[]
   onEditSchedule: (demand: Demand) => void
-  onUpdateStatus: (id: string, status: DemandStatus) => void
+  onUpdateStatus: (id: string, status: DemandStatus) => Promise<void> | void
 }
 
 export function DemandDetailsList({
