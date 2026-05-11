@@ -1,10 +1,11 @@
 "use client"
 
-import { CalendarClock, Clock, MapPin, UserRound, Users } from "lucide-react"
+import { CalendarClock, MapPin, UserRound, Users } from "lucide-react"
 
 import { StatusBadge } from "@/components/atoms/status-badge"
+import { DemandScheduleTrack } from "@/components/molecules/demand-schedule-track"
 import { Button } from "@/components/ui/button"
-import { dateFormatter, timeFormatter } from "@/lib/calendar"
+import { dateFormatter } from "@/lib/calendar"
 import {
   Demand,
   DemandStatus,
@@ -16,7 +17,7 @@ import { cn } from "@/lib/utils"
 type DemandCardProps = {
   demand: Demand
   onEditSchedule: (demand: Demand) => void
-  onUpdateStatus: (id: string, status: DemandStatus) => void
+  onUpdateStatus: (id: string, status: DemandStatus) => Promise<void> | void
 }
 
 export function DemandCard({
@@ -40,9 +41,6 @@ export function DemandCard({
             <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
               <UserRound className="size-3.5" />
               {demand.tecnico}
-            </span>
-            <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-              Equipe {demand.equipe}
             </span>
             <StatusBadge status={demand.status} />
           </div>
@@ -86,18 +84,12 @@ export function DemandCard({
           )}
         >
           <div className="flex items-center gap-2">
-            <CalendarClock className="size-4 text-slate-500" />
+            <CalendarClock className="size-4 shrink-0 text-slate-500" />
             <span className="font-medium capitalize">
               {dateFormatter.format(scheduledAt)}
             </span>
-            <span className="text-slate-500">
-              às {timeFormatter.format(scheduledAt)}
-            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="size-4 text-slate-500" />
-            <span>{demand.duracaoPrevista} previstos</span>
-          </div>
+          <DemandScheduleTrack compact demand={demand} />
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               className="flex-1 bg-slate-950 text-white hover:bg-slate-800"
