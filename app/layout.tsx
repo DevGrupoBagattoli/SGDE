@@ -1,3 +1,4 @@
+import type { Viewport } from "next"
 import { Geist_Mono, Outfit } from "next/font/google"
 
 import "./globals.css"
@@ -10,6 +11,14 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+/** Evita zoom automático no iOS ao focar inputs (e pinch-zoom), priorizando uso em celular. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
 export default function RootLayout({
   children,
