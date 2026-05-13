@@ -127,6 +127,7 @@ Importante:
 No host, defina ao menos:
 
 ```bash
+export APP_PORT="3100"
 export FIRST_MANAGER_NAME="Gestor Inicial"
 export FIRST_MANAGER_PASSWORD="troque-por-uma-senha-forte"
 ```
@@ -164,6 +165,14 @@ docker compose up -d app
 ```
 
 Aplicacao: http://localhost:3000
+
+Se a porta 3000 estiver ocupada no host, ajuste APP_PORT para outra porta (ex.: 3100). O container continua escutando internamente na 3000.
+
+Exemplo:
+
+```bash
+APP_PORT=3100 docker compose up -d app
+```
 
 ### Comportamento do primeiro usuario
 
