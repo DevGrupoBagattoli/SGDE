@@ -46,4 +46,4 @@ COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 EXPOSE 3000
 
-CMD ["pnpm", "start"]
+CMD ["node_modules/.bin/next", "start"]
