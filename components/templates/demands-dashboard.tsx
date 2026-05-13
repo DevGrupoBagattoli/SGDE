@@ -34,6 +34,7 @@ import {
   DemandStatus,
   matchesTechnicianDashboardFilter,
   statusLabels,
+  parseDurationDisplayMinutes,
   type SummaryDetailSegment,
 } from "@/lib/demands"
 
