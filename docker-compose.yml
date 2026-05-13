@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sgde-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sgde
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sgde"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - sgde_pgdata:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: .
+      target: builder
+    container_name: sgde-migrate
+    command: ["pnpm", "db:migrate:deploy"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sgde?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    profiles: ["ops"]
+
+  bootstrap:
+    build:
+      context: .
+      target: runner
+    container_name: sgde-bootstrap
+    command: ["node", "scripts/bootstrap-first-manager.mjs"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sgde?schema=public
+      FIRST_MANAGER_NAME: ${FIRST_MANAGER_NAME:-}
+      FIRST_MANAGER_PASSWORD: ${FIRST_MANAGER_PASSWORD:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    profiles: ["ops"]
+
+  app:
+    build:
+      context: .
+      target: runner
+    container_name: sgde-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sgde?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  sgde_pgdata:

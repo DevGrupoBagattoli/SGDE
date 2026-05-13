@@ -108,7 +108,68 @@ Eletricistas:
 - pnpm format: formatacao dos arquivos TS/TSX
 - pnpm db:generate: gera Prisma Client
 - pnpm db:migrate: cria/aplica migration local
+- pnpm db:migrate:deploy: aplica migrations em producao
 - pnpm db:seed: popula base com dados iniciais
+- pnpm bootstrap:first-manager: cria o primeiro gestor de forma idempotente
+
+## Deploy com Docker (producao)
+
+Este repositorio inclui [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml) e script de bootstrap inicial.
+
+Importante:
+
+- este fluxo nao inclui Nginx/Traefik
+- o seed atual e para dev/homolog e nao deve ser usado em producao
+- o bootstrap cria o primeiro gestor somente se ainda nao existir nenhum gestor
+
+### 1) Configure variaveis de ambiente
+
+No host, defina ao menos:
+
+```bash
+export FIRST_MANAGER_NAME="Gestor Inicial"
+export FIRST_MANAGER_PASSWORD="troque-por-uma-senha-forte"
+```
+
+Se preferir, voce pode colocar esses valores em um arquivo .env usado pelo docker compose.
+
+### 2) Build das imagens
+
+```bash
+docker compose build
+```
+
+### 3) Suba o banco
+
+```bash
+docker compose up -d db
+```
+
+### 4) Rode migrations de producao
+
+```bash
+docker compose --profile ops run --rm migrate
+```
+
+### 5) Rode bootstrap do primeiro gestor
+
+```bash
+docker compose --profile ops run --rm bootstrap
+```
+
+### 6) Suba a aplicacao
+
+```bash
+docker compose up -d app
+```
+
+Aplicacao: http://localhost:3000
+
+### Comportamento do primeiro usuario
+
+- se nao existir gestor, o script cria o usuario MANAGER com as variaveis FIRST_MANAGER_NAME e FIRST_MANAGER_PASSWORD
+- se ja existir qualquer gestor, o script nao altera nada e finaliza com sucesso
+- se o nome informado ja existir com outro perfil, o script falha para evitar sobrescrita
 
 ## Endpoints principais
 
