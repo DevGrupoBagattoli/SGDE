@@ -19,6 +19,14 @@ COPY . .
 
 RUN pnpm db:generate
 RUN pnpm build
+
+FROM base AS prod-deps
+
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/node_modules ./node_modules
+
 RUN pnpm prune --prod
 
 FROM node:20-alpine AS runner
@@ -29,7 +37,7 @@ ENV PORT=3000
 WORKDIR /app
 
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
