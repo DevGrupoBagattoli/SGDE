@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { ClipboardList, Menu } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -26,18 +27,27 @@ export function DashboardHero({ session, onMenuOpen }: DashboardHeroProps) {
           </div>
         </div>
 
-        {onMenuOpen ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            className="shrink-0 border-slate-200 bg-white"
-            aria-label="Abrir menu"
-            onClick={onMenuOpen}
-          >
-            <Menu className="size-5 text-slate-800" />
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          <Image
+            src="/bagattoli-tech-logo.png"
+            alt="Bagattoli Tech"
+            width={160}
+            height={40}
+            className="h-6 w-auto rounded-md sm:h-7 md:h-8"
+          />
+          {onMenuOpen ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="shrink-0 border-slate-200 bg-white"
+              aria-label="Abrir menu"
+              onClick={onMenuOpen}
+            >
+              <Menu className="size-5 text-slate-800" />
+            </Button>
+          ) : null}
+        </div>
       </div>
     </header>
   )
