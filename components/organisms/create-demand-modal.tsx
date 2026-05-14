@@ -16,6 +16,7 @@ type CreateDemandInput = Omit<Demand, "id" | "horarioFim" | "version" | "dateKey
 
 type CreateDemandModalProps = {
   currentTechnician?: string
+  isSaving?: boolean
   session: UserSession
   technicians: string[]
   onClose: () => void
@@ -27,6 +28,7 @@ const clamp = (n: number, min: number, max: number) =>
 
 export function CreateDemandModal({
   currentTechnician,
+  isSaving = false,
   session,
   technicians,
   onClose,
@@ -234,10 +236,12 @@ export function CreateDemandModal({
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit">Criar chamado</Button>
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? "Criando…" : "Criar chamado"}
+          </Button>
         </div>
       </form>
     </div>
