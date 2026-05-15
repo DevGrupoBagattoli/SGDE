@@ -8,6 +8,7 @@ export type SummaryDetailSegment = "total" | DemandStatus
 export type Demand = {
   id: string
   tecnico: string
+  solicitante: string
   equipe: string
   local: string
   descricao: string
@@ -96,6 +97,7 @@ export const mockDemands: Demand[] = [
   {
     id: "1",
     tecnico: "João Silva",
+    solicitante: "Gestor Admin",
     equipe: "Alpha",
     local: "Bloco A - Condomínio Solar",
     descricao: "Troca de fiação do quadro de força principal",
@@ -111,6 +113,7 @@ export const mockDemands: Demand[] = [
   {
     id: "2",
     tecnico: "Equipe Beta",
+    solicitante: "Gestor Admin",
     equipe: "Beta",
     local: "Rua das Flores, 123",
     descricao: "Reparo em poste de iluminação interna",
@@ -126,6 +129,7 @@ export const mockDemands: Demand[] = [
   {
     id: "3",
     tecnico: "Mariana Costa",
+    solicitante: "Gestor Admin",
     equipe: "Gamma",
     local: "Galpão Logístico Norte",
     descricao: "Inspeção preventiva de disjuntores e aterramento",
@@ -141,6 +145,7 @@ export const mockDemands: Demand[] = [
   {
     id: "4",
     tecnico: "Carlos Lima",
+    solicitante: "Gestor Admin",
     equipe: "Alpha",
     local: "Hospital Municipal - Ala B",
     descricao: "Correção de oscilação no circuito de emergência",

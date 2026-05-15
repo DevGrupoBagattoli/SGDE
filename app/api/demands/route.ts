@@ -93,6 +93,7 @@ export async function GET(request: Request) {
     },
     include: {
       technician: true,
+      createdBy: true,
       participants: {
         include: {
           user: true,
@@ -208,6 +209,7 @@ export async function POST(request: Request) {
     },
     include: {
       technician: true,
+      createdBy: true,
       participants: {
         include: {
           user: true,
