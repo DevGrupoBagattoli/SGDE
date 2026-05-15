@@ -33,8 +33,8 @@ import {
   Demand,
   DemandStatus,
   matchesTechnicianDashboardFilter,
-  statusLabels,
   parseDurationDisplayMinutes,
+  statusLabels,
   type SummaryDetailSegment,
 } from "@/lib/demands"
 
@@ -52,6 +52,7 @@ export function DemandsDashboard() {
   const [scheduleValue, setScheduleValue] = useState("")
   const [observationValue, setObservationValue] = useState("")
   const [scheduleError, setScheduleError] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
   const [requestWarning, setRequestWarning] = useState("")
   const [summarySegment, setSummarySegment] =
     useState<SummaryDetailSegment | null>(null)
@@ -91,8 +92,13 @@ export function DemandsDashboard() {
           setSelectedDate(today)
           setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
         }
-      } catch {
+      } catch (error) {
         setDemands([])
+        setGlobalError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar as demandas. Tente recarregar a página."
+        )
       } finally {
         setIsBooting(false)
       }
@@ -197,12 +203,15 @@ export function DemandsDashboard() {
   }
 
   const handleUpdateStatus = async (id: string, newStatus: DemandStatus) => {
+    if (isSaving) return
     setGlobalError("")
     setRequestWarning("")
+    setIsSaving(true)
 
     const currentDemand = demands.find((demand) => demand.id === id)
 
     if (!currentDemand) {
+      setIsSaving(false)
       return
     }
 
@@ -222,14 +231,18 @@ export function DemandsDashboard() {
       setGlobalError(
         error instanceof Error ? error.message : "Falha ao atualizar status"
       )
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleCreateDemand = async (
     newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">
   ) => {
+    if (isSaving) return
     setGlobalError("")
     setRequestWarning("")
+    setIsSaving(true)
 
     try {
       const response = await apiCreateDemand(newDemand)
@@ -253,6 +266,8 @@ export function DemandsDashboard() {
       setGlobalError(
         error instanceof Error ? error.message : "Falha ao criar demanda"
       )
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -274,7 +289,7 @@ export function DemandsDashboard() {
   ) => {
     event.preventDefault()
 
-    if (!editingDemand) {
+    if (!editingDemand || isSaving) {
       return
     }
 
@@ -284,8 +299,9 @@ export function DemandsDashboard() {
       ? new Date(new Date(scheduleValue).getTime() + durationMinutes * 60_000).toISOString()
       : editingDemand.horarioFim
 
-    const scheduleChanged = nextSchedule !== editingDemand.horarioInicio
-    const durationChanged = nextEndTime !== editingDemand.horarioFim
+    const truncateToMinute = (iso: string) => iso.slice(0, 16)
+    const scheduleChanged = truncateToMinute(nextSchedule) !== truncateToMinute(editingDemand.horarioInicio)
+    const durationChanged = truncateToMinute(nextEndTime) !== truncateToMinute(editingDemand.horarioFim)
 
     if ((scheduleChanged || durationChanged) && !observationValue.trim()) {
       setScheduleError(
@@ -293,6 +309,8 @@ export function DemandsDashboard() {
       )
       return
     }
+
+    setIsSaving(true)
 
     try {
       const response = await apiUpdateSchedule(editingDemand.id, {
@@ -303,9 +321,11 @@ export function DemandsDashboard() {
         version: editingDemand.version,
       })
 
+      const updatedDemand = response.data.demand
+
       setDemands((currentDemands) =>
         currentDemands.map((demand) =>
-          demand.id === editingDemand.id ? response.data.demand : demand
+          demand.id === editingDemand.id ? updatedDemand : demand
         )
       )
 
@@ -317,9 +337,22 @@ export function DemandsDashboard() {
 
       setEditingDemand(null)
     } catch (error) {
-      setScheduleError(
-        error instanceof Error ? error.message : "Falha ao atualizar agenda"
-      )
+      const message = error instanceof Error ? error.message : "Falha ao atualizar agenda"
+      setScheduleError(message)
+
+      try {
+        const refreshed = await apiGetDemands()
+        setDemands(refreshed)
+        const latest = refreshed.find((d) => d.id === editingDemand.id)
+        if (latest) {
+          setEditingDemand(latest)
+          setScheduleValue(toDateTimeLocalValue(latest.horarioInicio))
+        }
+      } catch {
+        // keep stale data; the error message is already shown
+      }
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -443,6 +476,7 @@ export function DemandsDashboard() {
           allTechnicians={technicianOptions}
           demand={editingDemand}
           error={scheduleError}
+          isSaving={isSaving}
           observationValue={observationValue}
           scheduleValue={scheduleValue}
           onClose={() => setEditingDemand(null)}
@@ -461,6 +495,7 @@ export function DemandsDashboard() {
       {isCreateModalOpen ? (
         <CreateDemandModal
           currentTechnician={selectedTechnician}
+          isSaving={isSaving}
           session={session}
           technicians={technicianOptions}
           onClose={() => setIsCreateModalOpen(false)}

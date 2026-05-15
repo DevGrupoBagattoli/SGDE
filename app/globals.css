@@ -130,4 +130,24 @@
     @apply font-sans;
     color-scheme: light;
     }
+
+  /*
+   * iOS Safari amplia a página ao focar campos cuja fonte efetiva é < 16px
+   * (comum quando o campo herda text-sm de um modal/card). Força 16px nos
+   * controles nativos em telas estreitas e em interfaces primariamente touch.
+   */
+  @media (max-width: 64rem), (hover: none) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="hidden"]),
+    select,
+    textarea {
+      font-size: max(1rem, 16px) !important;
+    }
+  }
+
+  /* Radix Select usa <button>; mesma regra de 16px no iOS para não dar zoom ao abrir. */
+  @media (hover: none) {
+    [data-slot="select-trigger"] {
+      font-size: max(1rem, 16px) !important;
+    }
+  }
 }

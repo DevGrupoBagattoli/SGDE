@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/server/prisma"
 import { LoginPageClient } from "./_components/login-page-client"
 
+export const dynamic = "force-dynamic"
+
 export default async function LoginPage() {
   let technicians: { id: string; name: string }[] = []
 

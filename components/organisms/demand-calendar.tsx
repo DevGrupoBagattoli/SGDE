@@ -212,8 +212,8 @@ export function DemandCalendar({
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
-      <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+        <div className="flex min-w-0 w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-1 lg:w-auto">
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold tracking-tight">
@@ -255,8 +255,8 @@ export function DemandCalendar({
           ) : null}
         </div>
 
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end lg:max-w-md lg:shrink-0">
-          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700 sm:min-w-72">
+        <div className="flex min-w-0 w-full flex-col gap-3 sm:flex-row sm:items-end lg:max-w-md lg:shrink-0">
+          <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium text-slate-700 sm:min-w-0 sm:max-w-[min(100%,16rem)]">
             <span className="flex items-center gap-2">
               <Filter className="size-4" />
               Filtrar por eletricista
@@ -275,17 +275,18 @@ export function DemandCalendar({
             </select>
           </label>
 
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+          <div className="flex w-full shrink-0 items-center justify-center gap-0.5 self-stretch rounded-xl border border-slate-200 bg-slate-50 px-0.5 py-0.5 sm:w-auto sm:justify-start sm:self-auto">
             <Button
               aria-label="Mês anterior"
               size="icon-sm"
               type="button"
               variant="ghost"
+              className="size-8 shrink-0 p-0"
               onClick={() => onChangeMonth(-1)}
             >
-              <ChevronLeft className="size-4" />
+              <ChevronLeft className="size-3.5" />
             </Button>
-            <span className="min-w-40 text-center text-sm font-semibold capitalize text-slate-800">
+            <span className="min-w-0 whitespace-nowrap px-0.5 text-center text-xs font-semibold capitalize text-slate-800 sm:text-[0.8125rem]">
               {monthFormatter.format(currentMonth)}
             </span>
             <Button
@@ -293,9 +294,10 @@ export function DemandCalendar({
               size="icon-sm"
               type="button"
               variant="ghost"
+              className="size-8 shrink-0 p-0"
               onClick={() => onChangeMonth(1)}
             >
-              <ChevronRight className="size-4" />
+              <ChevronRight className="size-3.5" />
             </Button>
           </div>
         </div>
