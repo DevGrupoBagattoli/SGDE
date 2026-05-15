@@ -8,6 +8,7 @@ export type SummaryDetailSegment = "total" | DemandStatus
 export type Demand = {
   id: string
   tecnico: string
+  solicitante: string
   equipe: string
   local: string
   descricao: string

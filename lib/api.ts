@@ -143,6 +143,15 @@ export const apiUpdateStatus = async (id: string, status: DemandStatus, version:
   return result
 }
 
+export const apiUpdateDescricao = async (id: string, descricao: string, version: number) => {
+  const result = await request<{ demand: Demand }>(`/api/demands/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ descricao, version }),
+  })
+
+  return result
+}
+
 export const apiUpdateSchedule = async (
   id: string,
   payload: {
