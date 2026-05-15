@@ -442,6 +442,8 @@ export function DemandsDashboard() {
           editingDemand.version
         )
         descricaoSaved = true
+        setEditingDemand(currentDemand)
+        setDescricaoValue(currentDemand.descricao)
       }
 
       if (scheduleFieldsChanged) {
@@ -484,6 +486,9 @@ export function DemandsDashboard() {
           setEditingDemand(latest)
           setScheduleValue(toDateTimeLocalValue(latest.horarioInicio))
           setDescricaoValue(latest.descricao)
+          if (!descricaoSaved) {
+            setObservationValue(latest.observacoes)
+          }
         }
       } catch {
         // keep stale data; the error message is already shown
