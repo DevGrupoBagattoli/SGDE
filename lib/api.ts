@@ -208,3 +208,10 @@ export const apiDeleteUser = async (id: string) => {
   return result
 }
 
+export const apiDeleteDemand = async (id: string) => {
+  const result = await request<{ deleted: boolean; demandId: string }>(`/api/demands/${id}`, {
+    method: "DELETE",
+  })
+  return result
+}
+
