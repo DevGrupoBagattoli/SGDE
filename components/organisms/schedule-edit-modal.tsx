@@ -14,6 +14,7 @@ type ScheduleEditModalProps = {
   allTechnicians: string[]
   demand: Demand
   error: string
+  isSaving?: boolean
   observationValue: string
   scheduleValue: string
   onClose: () => void
@@ -33,6 +34,7 @@ export function ScheduleEditModal({
   allTechnicians,
   demand,
   error,
+  isSaving = false,
   observationValue,
   scheduleValue,
   onClose,
@@ -251,10 +253,12 @@ export function ScheduleEditModal({
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit">Salvar alteração</Button>
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? "Salvando…" : "Salvar alteração"}
+          </Button>
         </div>
       </form>
     </div>

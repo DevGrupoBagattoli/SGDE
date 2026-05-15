@@ -15,10 +15,14 @@ describe("getDateKey", () => {
 })
 
 describe("toDateTimeLocalValue", () => {
-  it("recorta ISO para valor datetime-local", () => {
-    expect(toDateTimeLocalValue("2026-05-11T14:30:00.000Z")).toBe(
-      "2026-05-11T14:30"
-    )
+  it("converte instante ISO para o mesmo relógio local que datetime-local usa ao salvar", () => {
+    const localValue = "2026-05-11T15:40"
+    const asIso = new Date(localValue).toISOString()
+    expect(toDateTimeLocalValue(asIso)).toBe(localValue)
+  })
+
+  it("retorna string vazia para ISO inválido", () => {
+    expect(toDateTimeLocalValue("not-a-date")).toBe("")
   })
 })
 

@@ -23,7 +23,19 @@ export const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
   minute: "2-digit",
 })
 
-export const toDateTimeLocalValue = (isoDate: string) => isoDate.slice(0, 16)
+/** Valor para `input[type=datetime-local]`: componentes de data/hora no fuso local do instante ISO. */
+export const toDateTimeLocalValue = (isoDate: string) => {
+  const d = new Date(isoDate)
+  if (Number.isNaN(d.getTime())) {
+    return ""
+  }
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  const h = String(d.getHours()).padStart(2, "0")
+  const min = String(d.getMinutes()).padStart(2, "0")
+  return `${y}-${mo}-${day}T${h}:${min}`
+}
 
 export const getDateKey = (date: Date) =>
   [

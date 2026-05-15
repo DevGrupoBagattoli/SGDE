@@ -1,6 +1,7 @@
 "use client"
 
 import { FormEvent, useState } from "react"
+import Image from "next/image"
 import { Eye, EyeOff, HardHat, ShieldCheck } from "lucide-react"
 import { z } from "zod"
 
@@ -196,6 +197,20 @@ export function LoginScreen({ technicians, onLogin, isLoading, error: externalEr
         {isLoading ? (
           <div className="text-sm font-medium text-slate-600">Autenticando...</div>
         ) : null}
+
+        <footer className="mt-10 flex flex-col items-center gap-2 border-t border-slate-200 pt-8 pb-2 sm:flex-row sm:justify-between sm:gap-4">
+          <p className="text-center text-xs text-slate-500 sm:text-left">
+            Solução desenvolvida por
+          </p>
+          <Image
+            src="/bagattoli-tech-logo.png"
+            alt="Bagattoli Tech"
+            width={220}
+            height={52}
+            className="h-9 w-auto sm:h-10"
+            priority
+          />
+        </footer>
       </section>
     </main>
   )
