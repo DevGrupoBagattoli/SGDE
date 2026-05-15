@@ -1,6 +1,6 @@
-import { CheckCircle2, TimerReset, UsersRound } from "lucide-react"
+import { Ban, CheckCircle2, TimerReset, UsersRound } from "lucide-react"
 
-export type DemandStatus = "Pendente" | "Em Andamento" | "Concluído"
+export type DemandStatus = "Pendente" | "Em Andamento" | "Concluído" | "Cancelado"
 
 /** Filtro do modal de resumo (card Total ou um status). */
 export type SummaryDetailSegment = "total" | DemandStatus
@@ -164,6 +164,7 @@ export const statusLabels: DemandStatus[] = [
   "Pendente",
   "Em Andamento",
   "Concluído",
+  "Cancelado",
 ]
 
 export const statusOptions = statusLabels
@@ -202,6 +203,14 @@ export const statusStyles: Record<
     dot: "bg-emerald-500",
     icon: CheckCircle2,
     panel: "bg-emerald-50/70",
+  },
+  Cancelado: {
+    badge: "bg-slate-100 text-slate-600 ring-slate-200",
+    border: "border-l-slate-400",
+    calendar: "border-slate-200 bg-slate-50 text-slate-500",
+    dot: "bg-slate-400",
+    icon: Ban,
+    panel: "bg-slate-50/70",
   },
 }
 

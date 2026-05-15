@@ -16,6 +16,7 @@ enum DemandStatus {
   PENDING
   IN_PROGRESS
   DONE
+  CANCELLED
 }
 
 model User {

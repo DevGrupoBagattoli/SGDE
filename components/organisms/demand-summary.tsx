@@ -38,7 +38,11 @@ export function DemandSummary({
             ?.total ?? 0
         const Icon = statusStyles[status].icon
         const iconClassName =
-          status === "Concluído" ? "size-4 text-emerald-500" : "size-4 text-blue-500"
+          status === "Concluído"
+            ? "size-4 text-emerald-500"
+            : status === "Cancelado"
+              ? "size-4 text-slate-400"
+              : "size-4 text-blue-500"
 
         return (
           <MetricCard
