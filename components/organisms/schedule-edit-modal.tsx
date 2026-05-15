@@ -13,11 +13,13 @@ import {
 type ScheduleEditModalProps = {
   allTechnicians: string[]
   demand: Demand
+  descricaoValue?: string
   error: string
   isSaving?: boolean
   observationValue: string
   scheduleValue: string
   onClose: () => void
+  onDescricaoChange?: (value: string) => void
   onObservationChange: (value: string) => void
   onScheduleChange: (value: string) => void
   onSubmit: (
@@ -33,11 +35,13 @@ const clamp = (n: number, min: number, max: number) =>
 export function ScheduleEditModal({
   allTechnicians,
   demand,
+  descricaoValue,
   error,
   isSaving = false,
   observationValue,
   scheduleValue,
   onClose,
+  onDescricaoChange,
   onObservationChange,
   onScheduleChange,
   onSubmit,
@@ -106,6 +110,21 @@ export function ScheduleEditModal({
             <X className="size-4" />
           </Button>
         </div>
+
+        {descricaoValue != null && onDescricaoChange ? (
+          <div className="mt-6 grid gap-2">
+            <label className="text-sm font-medium text-slate-700" htmlFor="demand-descricao">
+              Descrição
+            </label>
+            <textarea
+              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              id="demand-descricao"
+              rows={3}
+              value={descricaoValue}
+              onChange={(event) => onDescricaoChange(event.target.value)}
+            />
+          </div>
+        ) : null}
 
         <div className="mt-6 grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">

@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useState } from "react"
-import { X } from "lucide-react"
+import { Eye, EyeOff, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { UserDto } from "@/lib/api"
+import {
+  validateUserName,
+  validateUserPassword,
+} from "@/lib/users"
 
 type UserModalProps = {
   user?: UserDto | null
@@ -31,6 +35,7 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
     user?.role ?? "eletricista"
   )
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
@@ -40,21 +45,30 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
     setIsSubmitting(true)
 
     try {
+      const trimmedName = name.trim()
+      const nameError = validateUserName(trimmedName)
+      if (nameError) {
+        throw new Error(nameError)
+      }
+
+      const passwordError = validateUserPassword(password, {
+        required: !user,
+      })
+      if (passwordError) {
+        throw new Error(passwordError)
+      }
+
       const payload: {
         name: string
         role: "gestor" | "eletricista"
         password?: string
       } = {
-        name: name.trim(),
+        name: trimmedName,
         role,
       }
 
       if (password) {
         payload.password = password
-      }
-
-      if (!user && !password) {
-        throw new Error("A senha é obrigatória para novos usuários.")
       }
 
       await onSave(payload)
@@ -131,14 +145,29 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
             <Label htmlFor="user-password">
               {user ? "Nova senha (opcional)" : "Senha"}
             </Label>
-            <Input
-              id="user-password"
-              type="password"
-              required={!user}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder={user ? "Deixe em branco para manter" : "Senha de acesso"}
-            />
+            <div className="relative">
+              <Input
+                id="user-password"
+                className="pr-10"
+                required={!user}
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={user ? "Deixe em branco para manter" : "Senha de acesso"}
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

@@ -40,13 +40,20 @@ export function DemandScheduleTrack({
 
         <div className="relative flex min-h-9 min-w-0 flex-1 items-center">
           <div
-            className="absolute left-0 right-4 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-slate-200 via-sky-400 to-blue-600 sm:right-5"
+            className={cn(
+              "absolute left-0 right-4 top-1/2 -translate-y-1/2 sm:right-5",
+              compact
+                ? "h-px bg-slate-300"
+                : "h-1 rounded-full bg-gradient-to-r from-slate-200 via-sky-400 to-blue-600"
+            )}
             aria-hidden
           />
           <div
             className={cn(
-              "relative z-[1] ml-auto flex shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md ring-2 ring-white",
-              compact ? "size-6" : "size-7 sm:size-8"
+              "relative z-[1] ml-auto flex shrink-0 items-center justify-center rounded-full ring-2 ring-white",
+              compact
+                ? "size-5 bg-slate-600 text-white"
+                : "size-7 bg-blue-600 text-white shadow-md sm:size-8"
             )}
             aria-hidden
           >
@@ -60,8 +67,8 @@ export function DemandScheduleTrack({
         <div className={cn("shrink-0 text-right", compact ? "" : "min-w-[4.25rem]")}>
           <p
             className={cn(
-              "font-bold tabular-nums tracking-tight text-blue-700",
-              compact ? "text-sm" : "text-lg sm:text-xl"
+              "font-bold tabular-nums tracking-tight",
+              compact ? "text-sm text-slate-900" : "text-lg text-blue-700 sm:text-xl"
             )}
           >
             {timeFormatter.format(end)}

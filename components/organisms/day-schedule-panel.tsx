@@ -9,16 +9,20 @@ import { Demand } from "@/lib/demands"
 type DaySchedulePanelProps = {
   demands: Demand[]
   selectedDate: Date
+  isManager?: boolean
+  onDeleteDemand?: (demand: Demand) => void
   onSelectDemand: (demand: Demand) => void
 }
 
 export function DaySchedulePanel({
   demands,
   selectedDate,
+  isManager,
+  onDeleteDemand,
   onSelectDemand,
 }: DaySchedulePanelProps) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Horários ocupados</h2>
@@ -37,7 +41,9 @@ export function DaySchedulePanel({
           demands.map((demand) => (
             <DemandTimeSlot
               demand={demand}
+              isManager={isManager}
               key={demand.id}
+              onDeleteDemand={onDeleteDemand}
               onSelect={onSelectDemand}
             />
           ))
