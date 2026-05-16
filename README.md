@@ -180,6 +180,29 @@ APP_PORT=3100 docker compose up -d app
 - se ja existir qualquer gestor, o script nao altera nada e finaliza com sucesso
 - se o nome informado ja existir com outro perfil, o script falha para evitar sobrescrita
 
+### Atualizacao em producao
+
+Sem mudanca no schema do Prisma:
+
+```bash
+docker compose build app
+docker compose up -d app
+```
+
+Com mudanca no schema do Prisma (nova migration):
+
+```bash
+docker compose build app
+docker compose --profile ops run --rm migrate
+docker compose up -d app
+```
+
+Ordem recomendada quando houver migration:
+
+- rode migrate antes de subir a nova versao da app
+- nao rode db:seed em producao
+- bootstrap so e necessario em ambiente novo, sem gestor inicial
+
 ## Endpoints principais
 
 Autenticacao:
