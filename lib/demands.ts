@@ -8,6 +8,7 @@ export type SummaryDetailSegment = "total" | DemandStatus
 export type Demand = {
   id: string
   tecnico: string
+  solicitante?: string
   equipe: string
   local: string
   descricao: string
@@ -19,6 +20,26 @@ export type Demand = {
   participantes: string[]
   version: number
   dateKeys: string[]
+}
+
+/** Alinhado a `updateDescricaoSchema` em `lib/server/demands.ts`. */
+export const DEMAND_DESCRICAO_MIN_LENGTH = 3
+
+export const validateDemandDescricao = (value: string): string | null => {
+  const trimmed = value.trim()
+  if (trimmed.length < DEMAND_DESCRICAO_MIN_LENGTH) {
+    return `A descrição deve ter pelo menos ${DEMAND_DESCRICAO_MIN_LENGTH} caracteres.`
+  }
+  return null
+}
+
+export const sameParticipants = (first: string[], second: string[]): boolean => {
+  if (first.length !== second.length) return false
+  const sortNames = (names: string[]) =>
+    [...names].sort((a, b) => a.localeCompare(b, "pt-BR"))
+  const sortedFirst = sortNames(first)
+  const sortedSecond = sortNames(second)
+  return sortedFirst.every((name, index) => name === sortedSecond[index])
 }
 
 /** Gestor filtra pelo técnico responsável; eletricista vê demandas onde é responsável ou participante. */
@@ -96,6 +117,7 @@ export const mockDemands: Demand[] = [
   {
     id: "1",
     tecnico: "João Silva",
+    solicitante: "Gestor Admin",
     equipe: "Alpha",
     local: "Bloco A - Condomínio Solar",
     descricao: "Troca de fiação do quadro de força principal",
@@ -111,6 +133,7 @@ export const mockDemands: Demand[] = [
   {
     id: "2",
     tecnico: "Equipe Beta",
+    solicitante: "Gestor Admin",
     equipe: "Beta",
     local: "Rua das Flores, 123",
     descricao: "Reparo em poste de iluminação interna",
@@ -126,6 +149,7 @@ export const mockDemands: Demand[] = [
   {
     id: "3",
     tecnico: "Mariana Costa",
+    solicitante: "Gestor Admin",
     equipe: "Gamma",
     local: "Galpão Logístico Norte",
     descricao: "Inspeção preventiva de disjuntores e aterramento",
@@ -141,6 +165,7 @@ export const mockDemands: Demand[] = [
   {
     id: "4",
     tecnico: "Carlos Lima",
+    solicitante: "Gestor Admin",
     equipe: "Alpha",
     local: "Hospital Municipal - Ala B",
     descricao: "Correção de oscilação no circuito de emergência",

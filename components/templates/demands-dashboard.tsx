@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useEffect, useMemo, useState } from "react"
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { CreateDemandModal } from "@/components/organisms/create-demand-modal"
@@ -15,6 +15,16 @@ import { DemandDetailsList } from "@/components/organisms/demand-details-list"
 import { DemandSummary } from "@/components/organisms/demand-summary"
 import { DemandSummaryDetailModal } from "@/components/organisms/demand-summary-detail-modal"
 import { ScheduleEditModal } from "@/components/organisms/schedule-edit-modal"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useSession } from "@/hooks/use-session"
 import {
   buildCalendarDays,
@@ -24,8 +34,10 @@ import {
 } from "@/lib/calendar"
 import {
   apiCreateDemand,
+  apiDeleteDemand,
   apiGetDemands,
   apiGetTechnicians,
+  apiUpdateDescricao,
   apiUpdateSchedule,
   apiUpdateStatus,
 } from "@/lib/api"
@@ -34,8 +46,10 @@ import {
   DemandStatus,
   matchesTechnicianDashboardFilter,
   parseDurationDisplayMinutes,
+  sameParticipants,
   statusLabels,
   type SummaryDetailSegment,
+  validateDemandDescricao,
 } from "@/lib/demands"
 
 export function DemandsDashboard() {
@@ -49,7 +63,10 @@ export function DemandsDashboard() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedTechnician, setSelectedTechnician] = useState("Todos")
   const [editingDemand, setEditingDemand] = useState<Demand | null>(null)
+  const [deletingDemand, setDeletingDemand] = useState<Demand | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [scheduleValue, setScheduleValue] = useState("")
+  const [descricaoValue, setDescricaoValue] = useState("")
   const [observationValue, setObservationValue] = useState("")
   const [scheduleError, setScheduleError] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -153,6 +170,13 @@ export function DemandsDashboard() {
     if (summarySegment === "total") return filteredDemands
     return filteredDemands.filter((d) => d.status === summarySegment)
   }, [filteredDemands, summarySegment])
+
+  const activeSummarySegment = useMemo((): SummaryDetailSegment | null => {
+    if (summarySegment === null || summaryModalDemands.length === 0) {
+      return null
+    }
+    return summarySegment
+  }, [summarySegment, summaryModalDemands.length])
 
   const calendarDays = useMemo(
     () => buildCalendarDays(currentMonth),
@@ -276,10 +300,73 @@ export function DemandsDashboard() {
   }
 
   const handleOpenScheduleEditor = (demand: Demand) => {
+    if (isSaving || isDeleting) return
     setEditingDemand(demand)
     setScheduleValue(toDateTimeLocalValue(demand.horarioInicio))
+    setDescricaoValue(demand.descricao)
     setObservationValue(demand.observacoes)
     setScheduleError("")
+  }
+
+  const handleUpdateDescricao = async (
+    id: string,
+    descricao: string,
+    version: number
+  ) => {
+    const response = await apiUpdateDescricao(id, descricao, version)
+    const updatedDemand = response.data.demand
+
+    setDemands((currentDemands) =>
+      currentDemands.map((demand) =>
+        demand.id === id ? updatedDemand : demand
+      )
+    )
+
+    if (response.warnings.length > 0) {
+      setRequestWarning(response.warnings[0].message)
+    }
+
+    return updatedDemand
+  }
+
+  const handleRequestDelete = useCallback(
+    (demand: Demand) => {
+      if (isSaving || isDeleting) return
+      setDeletingDemand(demand)
+    },
+    [isDeleting, isSaving]
+  )
+
+  const handleConfirmDelete = async () => {
+    if (!deletingDemand || isDeleting || isSaving) return
+
+    const deletedId = deletingDemand.id
+    const shouldCloseSummary =
+      summarySegment !== null &&
+      summaryModalDemands.filter((demand) => demand.id !== deletedId).length === 0
+
+    setGlobalError("")
+    setIsDeleting(true)
+
+    try {
+      await apiDeleteDemand(deletedId)
+      setDemands((currentDemands) =>
+        currentDemands.filter((demand) => demand.id !== deletedId)
+      )
+      if (editingDemand?.id === deletedId) {
+        setEditingDemand(null)
+      }
+      if (shouldCloseSummary) {
+        setSummarySegment(null)
+      }
+      setDeletingDemand(null)
+    } catch (error) {
+      setGlobalError(
+        error instanceof Error ? error.message : "Falha ao excluir demanda"
+      )
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const handleUpdateSchedule = async (
@@ -303,42 +390,93 @@ export function DemandsDashboard() {
     const scheduleChanged = truncateToMinute(nextSchedule) !== truncateToMinute(editingDemand.horarioInicio)
     const durationChanged = truncateToMinute(nextEndTime) !== truncateToMinute(editingDemand.horarioFim)
 
-    if ((scheduleChanged || durationChanged) && !observationValue.trim()) {
+    const trimmedDescricao = descricaoValue.trim()
+    const trimmedObservacoes = observationValue.trim()
+    const descricaoChanged = trimmedDescricao !== editingDemand.descricao
+    const observacoesChanged = trimmedObservacoes !== editingDemand.observacoes
+    const participantesChanged = !sameParticipants(
+      participantes,
+      editingDemand.participantes
+    )
+    const duracaoChanged = duracaoPrevista !== editingDemand.duracaoPrevista
+    const scheduleFieldsChanged =
+      scheduleChanged ||
+      durationChanged ||
+      duracaoChanged ||
+      observacoesChanged ||
+      participantesChanged
+
+    if (descricaoChanged) {
+      const descricaoError = validateDemandDescricao(trimmedDescricao)
+      if (descricaoError) {
+        setScheduleError(descricaoError)
+        return
+      }
+    }
+
+    if ((scheduleChanged || durationChanged) && !trimmedObservacoes) {
       setScheduleError(
         "Informe uma observação para justificar a alteração de dia, horário ou duração."
       )
       return
     }
 
+    if (!descricaoChanged && !scheduleFieldsChanged) {
+      setEditingDemand(null)
+      return
+    }
+
     setIsSaving(true)
+    setGlobalError("")
+    setRequestWarning("")
+
+    let descricaoSaved = false
 
     try {
-      const response = await apiUpdateSchedule(editingDemand.id, {
-        horarioInicio: nextSchedule,
-        duracaoPrevista,
-        observacoes: observationValue.trim(),
-        participantes,
-        version: editingDemand.version,
-      })
+      let currentDemand = editingDemand
 
-      const updatedDemand = response.data.demand
-
-      setDemands((currentDemands) =>
-        currentDemands.map((demand) =>
-          demand.id === editingDemand.id ? updatedDemand : demand
+      if (descricaoChanged) {
+        currentDemand = await handleUpdateDescricao(
+          editingDemand.id,
+          trimmedDescricao,
+          editingDemand.version
         )
-      )
+        descricaoSaved = true
+        setEditingDemand(currentDemand)
+        setDescricaoValue(currentDemand.descricao)
+      }
 
-      if (response.warnings.length > 0) {
-        setRequestWarning(response.warnings[0].message)
-      } else {
-        setRequestWarning("")
+      if (scheduleFieldsChanged) {
+        const response = await apiUpdateSchedule(currentDemand.id, {
+          horarioInicio: nextSchedule,
+          duracaoPrevista,
+          observacoes: trimmedObservacoes,
+          participantes,
+          version: currentDemand.version,
+        })
+
+        const updatedDemand = response.data.demand
+
+        setDemands((currentDemands) =>
+          currentDemands.map((demand) =>
+            demand.id === editingDemand.id ? updatedDemand : demand
+          )
+        )
+
+        if (response.warnings.length > 0) {
+          setRequestWarning(response.warnings[0].message)
+        }
       }
 
       setEditingDemand(null)
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Falha ao atualizar agenda"
-      setScheduleError(message)
+      const baseMessage =
+        error instanceof Error ? error.message : "Falha ao atualizar demanda"
+      setScheduleError(
+        descricaoSaved
+          ? `${baseMessage} A descrição já foi salva; confira o horário e tente novamente.`
+          : baseMessage
+      )
 
       try {
         const refreshed = await apiGetDemands()
@@ -347,6 +485,10 @@ export function DemandsDashboard() {
         if (latest) {
           setEditingDemand(latest)
           setScheduleValue(toDateTimeLocalValue(latest.horarioInicio))
+          setDescricaoValue(latest.descricao)
+          if (!descricaoSaved) {
+            setObservationValue(latest.observacoes)
+          }
         }
       } catch {
         // keep stale data; the error message is already shown
@@ -397,12 +539,13 @@ export function DemandsDashboard() {
           </div>
         ) : null}
         <>
-          <div className="flex flex-col gap-4 md:hidden">
+          <div className="flex flex-col gap-6 md:hidden">
             {mobileMainView === "day" ? (
               <DemandCalendar
                 calendarDays={calendarDays}
                 currentMonth={currentMonth}
                 demandsByDate={demandsByDate}
+                isManager={isManager}
                 isTechnicianFilterLocked={isElectrician}
                 selectedDateKey={selectedDateKey}
                 selectedTechnician={selectedTechnician}
@@ -414,6 +557,7 @@ export function DemandsDashboard() {
                 onCreateDemand={
                   isManager ? () => setIsCreateModalOpen(true) : undefined
                 }
+                onDeleteDemand={handleRequestDelete}
                 onSelectDate={setSelectedDate}
                 onSelectDemand={handleOpenScheduleEditor}
               />
@@ -426,6 +570,8 @@ export function DemandsDashboard() {
                 />
                 <DemandDetailsList
                   demands={filteredDemands}
+                  isManager={isManager}
+                  onDeleteDemand={handleRequestDelete}
                   onEditSchedule={handleOpenScheduleEditor}
                   onUpdateStatus={handleUpdateStatus}
                 />
@@ -443,6 +589,7 @@ export function DemandsDashboard() {
               calendarDays={calendarDays}
               currentMonth={currentMonth}
               demandsByDate={demandsByDate}
+              isManager={isManager}
               isTechnicianFilterLocked={isElectrician}
               selectedDateKey={selectedDateKey}
               selectedTechnician={selectedTechnician}
@@ -454,16 +601,21 @@ export function DemandsDashboard() {
               onCreateDemand={
                 isManager ? () => setIsCreateModalOpen(true) : undefined
               }
+              onDeleteDemand={handleRequestDelete}
               onSelectDate={setSelectedDate}
               onSelectDemand={handleOpenScheduleEditor}
             />
             <DaySchedulePanel
               demands={selectedDayDemands}
+              isManager={isManager}
               selectedDate={selectedDate}
+              onDeleteDemand={handleRequestDelete}
               onSelectDemand={handleOpenScheduleEditor}
             />
             <DemandDetailsList
               demands={filteredDemands}
+              isManager={isManager}
+              onDeleteDemand={handleRequestDelete}
               onEditSchedule={handleOpenScheduleEditor}
               onUpdateStatus={handleUpdateStatus}
             />
@@ -475,11 +627,16 @@ export function DemandsDashboard() {
         <ScheduleEditModal
           allTechnicians={technicianOptions}
           demand={editingDemand}
+          descricaoValue={descricaoValue}
           error={scheduleError}
           isSaving={isSaving}
           observationValue={observationValue}
           scheduleValue={scheduleValue}
           onClose={() => setEditingDemand(null)}
+          onDescricaoChange={(value) => {
+            setDescricaoValue(value)
+            setScheduleError("")
+          }}
           onObservationChange={(value) => {
             setObservationValue(value)
             setScheduleError("")
@@ -505,12 +662,43 @@ export function DemandsDashboard() {
 
       <DemandSummaryDetailModal
         demands={summaryModalDemands}
-        segment={summarySegment}
+        segment={activeSummarySegment}
         onEditSchedule={handleOpenScheduleEditor}
         onOpenChange={(open) => {
           if (!open) setSummarySegment(null)
         }}
       />
+
+      <AlertDialog
+        open={deletingDemand !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeletingDemand(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir demanda</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a demanda{" "}
+              <strong>{deletingDemand?.descricao}</strong>? Esta ação não pode ser
+              desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              variant="destructive"
+              onClick={(event) => {
+                event.preventDefault()
+                void handleConfirmDelete()
+              }}
+            >
+              {isDeleting ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }

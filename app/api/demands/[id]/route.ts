@@ -3,7 +3,7 @@ import { UserRole } from "@prisma/client"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
-import { toDemandDto, updateStatusSchema, demandStatusToDb } from "@/lib/server/demands"
+import { toDemandDto, updateDescricaoSchema } from "@/lib/server/demands"
 import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const { id } = await params
 
   const payload = await request.json().catch(() => null)
-  const parsed = updateStatusSchema.safeParse(payload)
+  const parsed = updateDescricaoSchema.safeParse(payload)
 
   if (!parsed.success) {
     return jsonValidationError("Valores inválido", parsed.error.flatten())
@@ -51,18 +51,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return jsonError(403, "FORBIDDEN", "Usuário autenticado sem permissão para editar esta demanda", {
       demandId: id,
       userId: auth.user.id,
-      reason: "Somente gestor, técnico responsável ou regras de edição aplicáveis podem editar",
-    })
-  }
-
-  if (
-    auth.user.role === UserRole.ELECTRICIAN &&
-    demand.technicianId !== auth.user.id
-  ) {
-    return jsonError(403, "FORBIDDEN", "Participantes possuem acesso somente de visualização para esta demanda", {
-      demandId: id,
-      userId: auth.user.id,
-      technicianId: demand.technicianId,
+      reason: "Somente gestor ou técnico responsável podem editar",
     })
   }
 
@@ -73,22 +62,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     })
   }
 
-  const nextStatus = demandStatusToDb(parsed.data.status)
-
   const updated = await prisma.demand.update({
-    where: { id: demand.id },
+    where: { id },
     data: {
-      status: nextStatus,
-      version: {
-        increment: 1,
-      },
+      descricao: parsed.data.descricao,
+      version: { increment: 1 },
       audits: {
         create: {
           actorUserId: auth.user.id,
-          action: "UPDATE_STATUS",
-          field: "status",
-          previousValue: demand.status,
-          nextValue: nextStatus,
+          action: "UPDATE",
+          field: "descricao",
+          previousValue: demand.descricao,
+          nextValue: parsed.data.descricao,
           reason: null,
         },
       },
@@ -108,4 +93,41 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       dateKeys: enumerateDateKeysUtc(updated.inicioPrevisto, updated.fimPrevisto),
     },
   })
+}
+
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  const csrfError = await validateCsrf()
+
+  if (csrfError) {
+    return csrfError
+  }
+
+  const auth = await requireAuth()
+
+  if (auth.error) {
+    return auth.error
+  }
+
+  if (auth.user.role !== UserRole.MANAGER) {
+    return jsonError(403, "FORBIDDEN", "Somente gestores podem excluir demandas", {
+      userId: auth.user.id,
+      actualRole: auth.user.role,
+    })
+  }
+
+  const { id } = await params
+
+  const demand = await prisma.demand.findUnique({
+    where: { id },
+  })
+
+  if (!demand) {
+    return jsonError(404, "NOT_FOUND", "Demanda não encontrada para o identificador informado", {
+      demandId: id,
+    })
+  }
+
+  await prisma.demand.delete({ where: { id } })
+
+  return jsonOk({ deleted: true, demandId: id })
 }

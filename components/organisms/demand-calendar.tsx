@@ -135,6 +135,8 @@ type DemandCalendarProps = {
   onChangeTechnician: (technician: string) => void
   onSelectDate: (date: Date) => void
   onSelectDemand: (demand: Demand) => void
+  isManager?: boolean
+  onDeleteDemand?: (demand: Demand) => void
   showCreateButton?: boolean
   onCreateDemand?: () => void
 }
@@ -152,6 +154,8 @@ export function DemandCalendar({
   onChangeTechnician,
   onSelectDate,
   onSelectDemand,
+  isManager,
+  onDeleteDemand,
   showCreateButton = false,
   onCreateDemand,
 }: DemandCalendarProps) {
@@ -211,7 +215,7 @@ export function DemandCalendar({
   }, [currentMonth, monthDaysForStrip, mobileMonthView, todayKey])
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:p-6">
       <div className="flex min-w-0 flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
         <div className="flex min-w-0 w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between lg:flex-1 lg:w-auto">
           <div className="min-w-0 flex-1">
@@ -385,6 +389,8 @@ export function DemandCalendar({
                     <DemandTimeSlot
                       key={demand.id}
                       demand={demand}
+                      isManager={isManager}
+                      onDeleteDemand={onDeleteDemand}
                       onSelect={onSelectDemand}
                     />
                   ))}

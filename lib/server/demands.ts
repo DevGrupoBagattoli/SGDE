@@ -18,6 +18,7 @@ export const demandStatusToDb = (status: string): DemandStatus => {
 
 type DemandWithRelations = Demand & {
   technician: User
+  createdBy: User
   participants: Array<{ user: User }>
 }
 
@@ -25,6 +26,7 @@ export const toDemandDto = (demand: DemandWithRelations) => {
   return {
     id: demand.id,
     tecnico: demand.technician.name,
+    solicitante: demand.createdBy.name,
     equipe: demand.equipe,
     local: demand.local,
     descricao: demand.descricao,
@@ -53,6 +55,11 @@ export const createDemandSchema = z.object({
 
 export const updateStatusSchema = z.object({
   status: z.enum(["Pendente", "Em Andamento", "Concluído"]),
+  version: z.number().int().positive(),
+})
+
+export const updateDescricaoSchema = z.object({
+  descricao: z.string().min(3),
   version: z.number().int().positive(),
 })
 

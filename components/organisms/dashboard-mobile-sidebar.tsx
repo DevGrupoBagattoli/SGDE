@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import {
+  BarChart3,
   CalendarDays,
   ClipboardList,
-  List,
   LogOut,
   Users,
   X,
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-export type DashboardMobileMainView = "day" | "list"
+export type DashboardMobileMainView = "day" | "reports"
 
 type DashboardNavDrawerProps = {
   open: boolean
@@ -108,19 +108,19 @@ export function DashboardMobileSidebar({
                   type="button"
                   className={cn(
                     "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium transition-colors",
-                    view === "list"
+                    view === "reports"
                       ? "bg-slate-900 text-white"
                       : "text-slate-700 hover:bg-slate-100",
                   )}
-                  onClick={() => select("list")}
+                  onClick={() => select("reports")}
                 >
-                  <List
+                  <BarChart3
                     className={cn(
                       "size-5 shrink-0",
-                      view === "list" ? "text-white" : "text-slate-600",
+                      view === "reports" ? "text-white" : "text-slate-600",
                     )}
                   />
-                  Lista completa
+                  Relatórios
                 </button>
               </div>
 

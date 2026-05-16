@@ -150,6 +150,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       },
       include: {
         technician: true,
+        createdBy: true,
         participants: {
           include: {
             user: true,
