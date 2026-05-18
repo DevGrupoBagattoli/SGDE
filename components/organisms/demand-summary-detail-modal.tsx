@@ -30,6 +30,8 @@ function segmentTitle(segment: SummaryDetailSegment): string {
       return "Em andamento"
     case "Concluído":
       return "Concluídas"
+    case "Cancelado":
+      return "Canceladas"
   }
 }
 
@@ -49,7 +51,9 @@ function SimpleDemandRow({
       ? "bg-amber-50 text-amber-900"
       : demand.status === "Em Andamento"
         ? "bg-blue-50 text-blue-900"
-        : "bg-emerald-50 text-emerald-900"
+        : demand.status === "Cancelado"
+          ? "bg-slate-50 text-slate-500"
+          : "bg-emerald-50 text-emerald-900"
 
   return (
     <li className="border-b border-slate-100 py-3 last:border-b-0">

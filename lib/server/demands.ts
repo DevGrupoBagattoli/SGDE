@@ -6,6 +6,7 @@ import { formatDurationMinutes, parseDurationMinutes } from "@/lib/server/dates"
 export const demandStatusFromDb = (status: DemandStatus) => {
   if (status === DemandStatus.PENDING) return "Pendente"
   if (status === DemandStatus.IN_PROGRESS) return "Em Andamento"
+  if (status === DemandStatus.CANCELLED) return "Cancelado"
   return "Concluído"
 }
 
@@ -13,6 +14,7 @@ export const demandStatusToDb = (status: string): DemandStatus => {
   if (status === "Pendente") return DemandStatus.PENDING
   if (status === "Em Andamento") return DemandStatus.IN_PROGRESS
   if (status === "Concluído") return DemandStatus.DONE
+  if (status === "Cancelado") return DemandStatus.CANCELLED
   throw new Error("Status inválido")
 }
 
@@ -48,13 +50,13 @@ export const createDemandSchema = z.object({
   descricao: z.string().min(3),
   horarioInicio: z.iso.datetime(),
   duracaoPrevista: z.string().regex(/^\d{2}:\d{2}h$/),
-  status: z.enum(["Pendente", "Em Andamento", "Concluído"]),
+  status: z.enum(["Pendente", "Em Andamento", "Concluído", "Cancelado"]),
   observacoes: z.string().optional().default(""),
   participantes: z.array(z.string()).optional().default([]),
 })
 
 export const updateStatusSchema = z.object({
-  status: z.enum(["Pendente", "Em Andamento", "Concluído"]),
+  status: z.enum(["Pendente", "Em Andamento", "Concluído", "Cancelado"]),
   version: z.number().int().positive(),
 })
 
