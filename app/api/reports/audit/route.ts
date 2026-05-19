@@ -1,34 +1,22 @@
 import { z } from "zod"
 
+import {
+  formatAuditAction,
+  formatAuditField,
+  formatAuditRole,
+  formatAuditValue,
+} from "@/lib/audit-labels"
 import { requireManager, roleFromDb } from "@/lib/server/auth"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
-
-const ACTION_LABELS: Record<string, string> = {
-  create: "Criação",
-  update_status: "Alteração de status",
-  update_schedule: "Alteração de horário",
-  update_descricao: "Alteração de descrição",
-  add_participant: "Adição de participante",
-  remove_participant: "Remoção de participante",
-}
-
-const FIELD_LABELS: Record<string, string> = {
-  status: "Status",
-  inicioPrevisto: "Início previsto",
-  fimPrevisto: "Fim previsto",
-  duracaoMinutos: "Duração",
-  descricao: "Descrição",
-  participant: "Participante",
-}
 
 const querySchema = z.object({
   inicio: z.string().datetime().optional(),
   fim: z.string().datetime().optional(),
   acao: z
     .union([
-      z.enum(["schedule", "status", "create"]),
-      z.array(z.enum(["schedule", "status", "create"])),
+      z.enum(["schedule", "status", "create", "description"]),
+      z.array(z.enum(["schedule", "status", "create", "description"])),
     ])
     .optional(),
   ator: z.string().optional(),
@@ -36,10 +24,14 @@ const querySchema = z.object({
   export: z.literal("csv").optional(),
 })
 
-const ACTION_MAP: Record<"schedule" | "status" | "create", string[]> = {
-  create: ["create"],
-  status: ["update_status"],
-  schedule: ["update_schedule"],
+const ACTION_MAP: Record<
+  "schedule" | "status" | "create" | "description",
+  string[]
+> = {
+  create: ["CREATE"],
+  status: ["UPDATE_STATUS"],
+  schedule: ["UPDATE_SCHEDULE"],
+  description: ["UPDATE"],
 }
 
 export async function GET(request: Request) {
@@ -104,11 +96,11 @@ export async function GET(request: Request) {
     demandId: e.demandId,
     tecnico: e.demand.technician.name,
     ator: e.actor.name,
-    atorRole: roleFromDb(e.actor.role),
-    acao: ACTION_LABELS[e.action] ?? e.action,
-    campo: FIELD_LABELS[e.field] ?? e.field,
-    valorAnterior: e.previousValue ?? "",
-    novoValor: e.nextValue ?? "",
+    atorRole: formatAuditRole(roleFromDb(e.actor.role)),
+    acao: formatAuditAction(e.action),
+    campo: formatAuditField(e.field),
+    valorAnterior: formatAuditValue(e.field, e.previousValue ?? ""),
+    novoValor: formatAuditValue(e.field, e.nextValue ?? ""),
     justificativa: e.reason ?? "",
   }))
 

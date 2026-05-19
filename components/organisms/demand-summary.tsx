@@ -23,7 +23,7 @@ export function DemandSummary({
   onSelectSegment,
 }: DemandSummaryProps) {
   return (
-    <section className="grid gap-3 md:grid-cols-4">
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <MetricCard
         icon={totalMetricIcon}
         label="Total"
@@ -41,8 +41,10 @@ export function DemandSummary({
           status === "Concluído"
             ? "size-4 text-emerald-500"
             : status === "Cancelado"
-              ? "size-4 text-slate-400"
-              : "size-4 text-blue-500"
+              ? "size-4 text-slate-500"
+              : status === "Pendente"
+                ? "size-4 text-amber-500"
+                : "size-4 text-blue-500"
 
         return (
           <MetricCard

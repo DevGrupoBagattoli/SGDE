@@ -225,9 +225,9 @@ export const statusStyles: Record<
     panel: "bg-emerald-50/70",
   },
   Cancelado: {
-    badge: "bg-slate-100 text-slate-600 ring-slate-200",
+    badge: "bg-slate-100 text-slate-700 ring-slate-200",
     border: "border-l-slate-400",
-    calendar: "border-slate-200 bg-slate-50 text-slate-500",
+    calendar: "border-slate-200 bg-slate-50 text-slate-800",
     dot: "bg-slate-400",
     icon: Ban,
     panel: "bg-slate-50/70",

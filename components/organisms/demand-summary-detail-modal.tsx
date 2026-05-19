@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { dateFormatter, timeFormatter } from "@/lib/calendar"
-import { Demand, type SummaryDetailSegment } from "@/lib/demands"
+import { Demand, statusStyles, type SummaryDetailSegment } from "@/lib/demands"
 import { cn } from "@/lib/utils"
 
 type DemandSummaryDetailModalProps = {
@@ -46,14 +46,7 @@ function SimpleDemandRow({
   const time = timeFormatter.format(start)
   const dateLine = dateFormatter.format(start)
 
-  const statusClass =
-    demand.status === "Pendente"
-      ? "bg-amber-50 text-amber-900"
-      : demand.status === "Em Andamento"
-        ? "bg-blue-50 text-blue-900"
-        : demand.status === "Cancelado"
-          ? "bg-slate-50 text-slate-500"
-          : "bg-emerald-50 text-emerald-900"
+  const statusClass = statusStyles[demand.status].panel.replace("/70", "")
 
   return (
     <li className="border-b border-slate-100 py-3 last:border-b-0">

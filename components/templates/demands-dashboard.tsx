@@ -1,6 +1,8 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { BarChart3, CalendarDays, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { CreateDemandModal } from "@/components/organisms/create-demand-modal"
@@ -15,6 +17,20 @@ import { DemandDetailsList } from "@/components/organisms/demand-details-list"
 import { DemandSummary } from "@/components/organisms/demand-summary"
 import { DemandSummaryDetailModal } from "@/components/organisms/demand-summary-detail-modal"
 import { ScheduleEditModal } from "@/components/organisms/schedule-edit-modal"
+
+const ReportsPanel = dynamic(
+  () =>
+    import("@/components/organisms/reports-panel").then((module) => module.ReportsPanel),
+  {
+    loading: () => (
+      <div className="flex min-h-48 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm text-slate-500">
+        <Loader2 className="size-4 animate-spin text-slate-400" />
+        Carregando relatórios…
+      </div>
+    ),
+  }
+)
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +67,7 @@ import {
   type SummaryDetailSegment,
   validateDemandDescricao,
 } from "@/lib/demands"
+import { cn } from "@/lib/utils"
 
 export function DemandsDashboard() {
   const router = useRouter()
@@ -539,9 +556,43 @@ export function DemandsDashboard() {
           </div>
         ) : null}
         <>
+          {isManager ? (
+            <div className="hidden gap-2 rounded-2xl border border-slate-200 bg-white p-1 md:inline-flex">
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+                  mobileMainView !== "reports"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                )}
+                onClick={() => setMobileMainView("day")}
+              >
+                <CalendarDays className="size-4" />
+                Agenda
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+                  mobileMainView === "reports"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                )}
+                onClick={() => setMobileMainView("reports")}
+              >
+                <BarChart3 className="size-4" />
+                Relatórios
+              </button>
+            </div>
+          ) : null}
+
+          {mobileMainView === "reports" ? (
+            <ReportsPanel technicians={technicianOptions} />
+          ) : (
+            <>
           <div className="flex flex-col gap-6 md:hidden">
-            {mobileMainView === "day" ? (
-              <DemandCalendar
+            <DemandCalendar
                 calendarDays={calendarDays}
                 currentMonth={currentMonth}
                 demandsByDate={demandsByDate}
@@ -561,22 +612,6 @@ export function DemandsDashboard() {
                 onSelectDate={setSelectedDate}
                 onSelectDemand={handleOpenScheduleEditor}
               />
-            ) : (
-              <div className="flex flex-col gap-6">
-                <DemandSummary
-                  statusTotals={statusTotals}
-                  totalDemands={filteredDemands.length}
-                  onSelectSegment={setSummarySegment}
-                />
-                <DemandDetailsList
-                  demands={filteredDemands}
-                  isManager={isManager}
-                  onDeleteDemand={handleRequestDelete}
-                  onEditSchedule={handleOpenScheduleEditor}
-                  onUpdateStatus={handleUpdateStatus}
-                />
-              </div>
-            )}
           </div>
 
           <div className="hidden flex-col gap-6 md:flex">
@@ -620,6 +655,8 @@ export function DemandsDashboard() {
               onUpdateStatus={handleUpdateStatus}
             />
           </div>
+            </>
+          )}
         </>
       </section>
 
