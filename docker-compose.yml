@@ -22,7 +22,7 @@ services:
     container_name: sgde-migrate
     command: ["pnpm", "db:migrate:deploy"]
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/sgde?schema=public
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/sgde?schema=public}
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +37,7 @@ services:
     command: ["node", "scripts/bootstrap-first-manager.mjs"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/sgde?schema=public
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/sgde?schema=public}
       FIRST_MANAGER_NAME: ${FIRST_MANAGER_NAME:-}
       FIRST_MANAGER_PASSWORD: ${FIRST_MANAGER_PASSWORD:-}
     depends_on:
@@ -57,7 +57,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/sgde?schema=public
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/sgde?schema=public}
     depends_on:
       db:
         condition: service_healthy
