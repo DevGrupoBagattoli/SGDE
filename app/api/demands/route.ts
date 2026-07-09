@@ -15,7 +15,7 @@ import { prisma } from "@/lib/server/prisma"
 
 const querySchema = z.object({
   tecnico: z.string().optional(),
-  status: z.enum(["Pendente", "Em Andamento", "Concluído"]).optional(),
+  status: z.enum(["Pendente", "Em Andamento", "Concluído", "Cancelado"]).optional(),
   inicio: z.string().datetime().optional(),
   fim: z.string().datetime().optional(),
 })
@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       | "Pendente"
       | "Em Andamento"
       | "Concluído"
+      | "Cancelado"
       | undefined,
     inicio: parsedUrl.searchParams.get("inicio") ?? undefined,
     fim: parsedUrl.searchParams.get("fim") ?? undefined,
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
       Pendente: "PENDING",
       "Em Andamento": "IN_PROGRESS",
       Concluído: "DONE",
+      Cancelado: "CANCELLED",
     } as const
 
     andWhere.push({

@@ -1,5 +1,11 @@
 import { UserSession } from "@/lib/auth"
 import { Demand, DemandStatus } from "@/lib/demands"
+import type {
+  ReportAuditRow,
+  ReportDemandRow,
+  ReportOccupationTechnician,
+  ReportProductivityRow,
+} from "@/lib/reports"
 
 type ApiSuccess<T> = {
   success: true
@@ -222,5 +228,79 @@ export const apiDeleteDemand = async (id: string) => {
     method: "DELETE",
   })
   return result
+}
+
+const downloadCsv = async (path: string, params: URLSearchParams, filename: string) => {
+  const query = new URLSearchParams(params)
+  query.set("export", "csv")
+
+  const headers = new Headers()
+  const csrfHeaders = withCsrf("GET")
+  Object.entries(csrfHeaders).forEach(([key, value]) => {
+    if (value) headers.set(key, value)
+  })
+
+  const response = await fetch(`${path}?${query.toString()}`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+    cache: "no-store",
+  })
+
+  if (response.status === 401 && unauthorizedHandler) {
+    unauthorizedHandler()
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as ApiFailure | null
+    throw new Error(payload?.error.message ?? "Falha ao exportar relatório")
+  }
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+export const apiReportDemands = async (params: URLSearchParams) => {
+  const result = await request<{ demands: ReportDemandRow[]; total: number }>(
+    `/api/reports/demands?${params.toString()}`
+  )
+  return result.data
+}
+
+export const apiReportDemandsCsv = (params: URLSearchParams) =>
+  downloadCsv("/api/reports/demands", params, "relatorio-demandas.csv")
+
+export const apiReportProductivity = async (params: URLSearchParams) => {
+  const result = await request<{
+    technicians: ReportProductivityRow[]
+    total: number
+  }>(`/api/reports/productivity?${params.toString()}`)
+  return result.data
+}
+
+export const apiReportProductivityCsv = (params: URLSearchParams) =>
+  downloadCsv("/api/reports/productivity", params, "relatorio-produtividade.csv")
+
+export const apiReportAudit = async (params: URLSearchParams) => {
+  const result = await request<{ entries: ReportAuditRow[]; total: number }>(
+    `/api/reports/audit?${params.toString()}`
+  )
+  return result.data
+}
+
+export const apiReportAuditCsv = (params: URLSearchParams) =>
+  downloadCsv("/api/reports/audit", params, "relatorio-auditoria.csv")
+
+export const apiReportOccupation = async (params: URLSearchParams) => {
+  const result = await request<{
+    technicians: ReportOccupationTechnician[]
+    dateRange: string[]
+  }>(`/api/reports/occupation?${params.toString()}`)
+  return result.data
 }
 
