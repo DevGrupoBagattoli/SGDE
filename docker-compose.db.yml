@@ -1,0 +1,28 @@
+# Compose isolado do PostgreSQL para o Portainer.
+# O app roda no Coolify (ver Docs/plano-deploy-coolify.md).
+#
+# Uso:
+#   docker compose -f docker-compose.db.yml up -d
+#
+# ⚠️ Substitua POSTGRES_PASSWORD e o IP do bind pelos valores reais.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sgde-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sgde
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir-no-.env}
+    ports:
+      - "${DB_BIND_IP:-10.0.0.5}:5432:5432"   # bind na interface interna
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sgde"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - sgde_pgdata:/var/lib/postgresql/data
+
+volumes:
+  sgde_pgdata:
