@@ -65,11 +65,6 @@ export const updateDescricaoSchema = z.object({
   version: z.number().int().positive(),
 })
 
-export const updateDescricaoSchema = z.object({
-  descricao: z.string().min(3),
-  version: z.number().int().positive(),
-})
-
 export const updateScheduleSchema = z.object({
   horarioInicio: z.iso.datetime(),
   duracaoPrevista: z.string().regex(/^\d{2}:\d{2}h$/),
