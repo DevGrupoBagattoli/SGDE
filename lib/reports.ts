@@ -14,7 +14,7 @@ export type ReportDemandsFilters = ReportDateRange & {
 
 export type ReportProductivityFilters = ReportDateRange
 
-export type ReportAuditAction = "schedule" | "status" | "create" | "description"
+export type ReportAuditAction = "schedule" | "status" | "create" | "description" | "delete"
 
 export type ReportAuditFilters = ReportDateRange & {
   acao: ReportAuditAction[]
@@ -80,6 +80,7 @@ export const auditActionOptions: Array<{ value: ReportAuditAction; label: string
   { value: "status", label: "Status" },
   { value: "schedule", label: "Agenda" },
   { value: "description", label: "Descrição" },
+  { value: "delete", label: "Exclusão" },
 ]
 
 export const toIsoStartOfDay = (dateInput: string) => {

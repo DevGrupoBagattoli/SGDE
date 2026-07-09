@@ -67,6 +67,7 @@ model Demand {
   createdById      String
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
   technician       User               @relation("PrimaryTechnician", fields: [technicianId], references: [id])
   createdBy        User               @relation("CreatedBy", fields: [createdById], references: [id])
   participants     DemandParticipant[]
@@ -75,6 +76,7 @@ model Demand {
   @@index([technicianId])
   @@index([status])
   @@index([inicioPrevisto, fimPrevisto])
+  @@index([deletedAt])
 }
 
 model DemandParticipant {

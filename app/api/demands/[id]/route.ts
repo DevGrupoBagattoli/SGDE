@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     },
   })
 
-  if (!demand) {
+  if (!demand || demand.deletedAt) {
     return jsonError(404, "NOT_FOUND", "Demanda não encontrada para o identificador informado", {
       demandId: id,
     })
@@ -121,13 +121,31 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     where: { id },
   })
 
-  if (!demand) {
+  if (!demand || demand.deletedAt) {
     return jsonError(404, "NOT_FOUND", "Demanda não encontrada para o identificador informado", {
       demandId: id,
     })
   }
 
-  await prisma.demand.delete({ where: { id } })
+  // Soft delete: preserva a demanda e todo o histórico de auditoria,
+  // apenas marca `deletedAt`. Registra a ação de exclusão na trilha
+  // de auditoria antes de ocultar o registro das listagens.
+  await prisma.demand.update({
+    where: { id },
+    data: {
+      deletedAt: new Date(),
+      audits: {
+        create: {
+          actorUserId: auth.user.id,
+          action: "DELETE",
+          field: "*",
+          previousValue: demand.descricao,
+          nextValue: null,
+          reason: null,
+        },
+      },
+    },
+  })
 
   return jsonOk({ deleted: true, demandId: id })
 }

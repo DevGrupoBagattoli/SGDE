@@ -45,7 +45,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     },
   })
 
-  if (!demand) {
+  if (!demand || demand.deletedAt) {
     return jsonError(404, "NOT_FOUND", "Demanda não encontrada para o identificador informado", {
       demandId: id,
     })

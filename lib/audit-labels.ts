@@ -6,6 +6,7 @@ export const auditActionLabels: Record<string, string> = {
   UPDATE_STATUS: "Alteração de status",
   UPDATE_SCHEDULE: "Alteração de horário",
   UPDATE: "Alteração de descrição",
+  DELETE: "Exclusão",
   ADD_PARTICIPANT: "Adição de participante",
   REMOVE_PARTICIPANT: "Remoção de participante",
 }

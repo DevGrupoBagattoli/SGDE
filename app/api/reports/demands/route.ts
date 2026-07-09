@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { requireManager } from "@/lib/server/auth"
+import { buildCsv } from "@/lib/server/csv"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
 import { demandStatusFromDb, demandStatusToDb } from "@/lib/server/demands"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
 
   const { inicio, fim, status, tecnico, equipe } = queryParsed.data
 
-  const andWhere: object[] = []
+  const andWhere: object[] = [{ deletedAt: null }]
 
   if (inicio || fim) {
     const start = inicio ? new Date(inicio) : new Date("1970-01-01T00:00:00.000Z")
@@ -106,28 +107,24 @@ export async function GET(request: Request) {
       "Participantes",
     ]
 
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csv = buildCsv(
+      headers,
+      rows.map((r) => [
+        r.id,
+        r.tecnico,
+        r.equipe,
+        r.local,
+        r.descricao,
+        r.status,
+        r.horarioInicio,
+        r.horarioFim,
+        r.duracaoPrevista,
+        r.solicitante,
+        r.participantes,
+      ])
+    )
 
-    const csvLines = [
-      headers.join(","),
-      ...rows.map((r) =>
-        [
-          escape(r.id),
-          escape(r.tecnico),
-          escape(r.equipe),
-          escape(r.local),
-          escape(r.descricao),
-          escape(r.status),
-          escape(r.horarioInicio),
-          escape(r.horarioFim),
-          escape(r.duracaoPrevista),
-          escape(r.solicitante),
-          escape(r.participantes),
-        ].join(",")
-      ),
-    ]
-
-    return new Response(csvLines.join("\r\n"), {
+    return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": 'attachment; filename="relatorio-demandas.csv"',

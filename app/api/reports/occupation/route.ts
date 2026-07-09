@@ -44,6 +44,7 @@ export async function GET(request: Request) {
   const end = new Date(fim)
 
   const andWhere: object[] = [
+    { deletedAt: null },
     { inicioPrevisto: { lte: end } },
     { fimPrevisto: { gte: start } },
   ]

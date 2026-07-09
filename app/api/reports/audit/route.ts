@@ -7,6 +7,7 @@ import {
   formatAuditValue,
 } from "@/lib/audit-labels"
 import { requireManager, roleFromDb } from "@/lib/server/auth"
+import { buildCsv } from "@/lib/server/csv"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -15,8 +16,8 @@ const querySchema = z.object({
   fim: z.string().datetime().optional(),
   acao: z
     .union([
-      z.enum(["schedule", "status", "create", "description"]),
-      z.array(z.enum(["schedule", "status", "create", "description"])),
+      z.enum(["schedule", "status", "create", "description", "delete"]),
+      z.array(z.enum(["schedule", "status", "create", "description", "delete"])),
     ])
     .optional(),
   ator: z.string().optional(),
@@ -25,13 +26,14 @@ const querySchema = z.object({
 })
 
 const ACTION_MAP: Record<
-  "schedule" | "status" | "create" | "description",
+  "schedule" | "status" | "create" | "description" | "delete",
   string[]
 > = {
   create: ["CREATE"],
   status: ["UPDATE_STATUS"],
   schedule: ["UPDATE_SCHEDULE"],
   description: ["UPDATE"],
+  delete: ["DELETE"],
 }
 
 export async function GET(request: Request) {
@@ -118,27 +120,23 @@ export async function GET(request: Request) {
       "Justificativa",
     ]
 
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const csv = buildCsv(
+      headers,
+      rows.map((r) => [
+        r.createdAt,
+        r.demandId,
+        r.tecnico,
+        r.ator,
+        r.atorRole,
+        r.acao,
+        r.campo,
+        r.valorAnterior,
+        r.novoValor,
+        r.justificativa,
+      ])
+    )
 
-    const csvLines = [
-      headers.join(","),
-      ...rows.map((r) =>
-        [
-          escape(r.createdAt),
-          escape(r.demandId),
-          escape(r.tecnico),
-          escape(r.ator),
-          escape(r.atorRole),
-          escape(r.acao),
-          escape(r.campo),
-          escape(r.valorAnterior),
-          escape(r.novoValor),
-          escape(r.justificativa),
-        ].join(",")
-      ),
-    ]
-
-    return new Response(csvLines.join("\r\n"), {
+    return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": 'attachment; filename="relatorio-auditoria.csv"',

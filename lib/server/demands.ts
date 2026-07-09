@@ -121,10 +121,11 @@ export const parseScheduleUpdateData = (
 
 export const demandsWhereForUser = (user: User): Prisma.DemandWhereInput => {
   if (user.role === UserRole.MANAGER) {
-    return {}
+    return { deletedAt: null }
   }
 
   return {
+    deletedAt: null,
     OR: [
       { technicianId: user.id },
       { participants: { some: { userId: user.id } } },

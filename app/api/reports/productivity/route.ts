@@ -2,6 +2,7 @@ import { DemandStatus } from "@prisma/client"
 import { z } from "zod"
 
 import { requireManager } from "@/lib/server/auth"
+import { buildCsv } from "@/lib/server/csv"
 import { formatDurationMinutes } from "@/lib/server/dates"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
 
   const { inicio, fim, equipe } = queryParsed.data
 
-  const andWhere: object[] = []
+  const andWhere: object[] = [{ deletedAt: null }]
 
   if (inicio || fim) {
     const start = inicio ? new Date(inicio) : new Date("1970-01-01T00:00:00.000Z")
@@ -113,26 +114,22 @@ export async function GET(request: Request) {
       "Horas Previstas",
     ]
 
-    const escape = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
+    const csv = buildCsv(
+      headers,
+      rows.map((r) => [
+        r.tecnico,
+        r.equipe,
+        r.total,
+        r.pendentes,
+        r.emAndamento,
+        r.concluidas,
+        r.canceladas,
+        r.taxaConclusao,
+        r.horasPrevistas,
+      ])
+    )
 
-    const csvLines = [
-      headers.join(","),
-      ...rows.map((r) =>
-        [
-          escape(r.tecnico),
-          escape(r.equipe),
-          escape(r.total),
-          escape(r.pendentes),
-          escape(r.emAndamento),
-          escape(r.concluidas),
-          escape(r.canceladas),
-          escape(r.taxaConclusao),
-          escape(r.horasPrevistas),
-        ].join(",")
-      ),
-    ]
-
-    return new Response(csvLines.join("\r\n"), {
+    return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": 'attachment; filename="relatorio-produtividade.csv"',

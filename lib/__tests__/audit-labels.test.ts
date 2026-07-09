@@ -16,6 +16,7 @@ describe("audit-labels", () => {
   it("traduz ações do banco", () => {
     expect(formatAuditAction("UPDATE_STATUS")).toBe("Alteração de status")
     expect(formatAuditAction("CREATE")).toBe("Criação")
+    expect(formatAuditAction("DELETE")).toBe("Exclusão")
   })
 
   it("traduz campos alterados", () => {
