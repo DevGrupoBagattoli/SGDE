@@ -1,6 +1,7 @@
 # Deploy no Coolify — SGDCF
 
 > **Versão:** 1.0 · Atualizado em: jun/2026
+> ⚠️ **Documento de referência do projeto SGDCF.** Este guia documenta o deploy de outro projeto de estrutura similar. Não aplicável diretamente ao SGDE — consulte [`plano-deploy-coolify.md`](./plano-deploy-coolify.md) para o plano específico do SGDE.
 
 Guia passo a passo para colocar o SGDCF em produção usando o Coolify self-hosted.
 
