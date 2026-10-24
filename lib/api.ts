@@ -180,6 +180,7 @@ export type UserDto = {
   id: string
   name: string
   role: "gestor" | "eletricista"
+  email: string | null
   createdAt: string
   updatedAt: string
 }
@@ -193,6 +194,7 @@ export const apiCreateUser = async (payload: {
   name: string
   role: "gestor" | "eletricista"
   password?: string
+  email?: string
 }) => {
   const result = await request<{ user: UserDto }>("/api/users", {
     method: "POST",
@@ -207,6 +209,7 @@ export const apiUpdateUser = async (
     name?: string
     role?: "gestor" | "eletricista"
     password?: string
+    email?: string
   }
 ) => {
   const result = await request<{ user: UserDto }>(`/api/users/${id}`, {
@@ -301,6 +304,94 @@ export const apiReportOccupation = async (params: URLSearchParams) => {
     technicians: ReportOccupationTechnician[]
     dateRange: string[]
   }>(`/api/reports/occupation?${params.toString()}`)
+  return result.data
+}
+
+export type NotificationDto = {
+  id: string
+  type: "SERVICE_UPCOMING" | "SERVICE_FINISH_REMINDER"
+  priority: "NORMAL" | "CRITICAL"
+  title: string
+  body: string
+  demandId: string | null
+  data: { url?: string; tag?: string } | null
+  createdAt: string
+  readAt: string | null
+  ackAt: string | null
+  deliveries: Array<{
+    channel: "PUSH" | "EMAIL"
+    status: "PENDING" | "SENT" | "FAILED" | "CANCELLED"
+    sentAt: string | null
+  }>
+}
+
+export const apiGetNotifications = async () => {
+  const result = await request<{
+    notifications: NotificationDto[]
+    unreadCount: number
+  }>("/api/notifications")
+  return result.data
+}
+
+export const apiGetUnreadCount = async () => {
+  const result = await request<{ unreadCount: number }>(
+    "/api/notifications/unread-count"
+  )
+  return result.data
+}
+
+export const apiMarkNotificationRead = async (id: string) => {
+  const result = await request<{ notificationId: string; readAt: string }>(
+    `/api/notifications/${id}/read`,
+    { method: "POST" }
+  )
+  return result.data
+}
+
+export const apiMarkAllNotificationsRead = async () => {
+  const result = await request<{ updatedCount: number }>(
+    "/api/notifications/read-all",
+    { method: "POST" }
+  )
+  return result.data
+}
+
+export const apiAckNotification = async (id: string) => {
+  const result = await request<{
+    notificationId: string
+    ackAt: string
+    readAt: string
+  }>(`/api/notifications/${id}/ack`, { method: "POST" })
+  return result.data
+}
+
+export const apiGetVapidPublicKey = async () => {
+  const result = await request<{ publicKey: string }>(
+    "/api/push/vapid-public-key"
+  )
+  return result.data
+}
+
+export const apiSubscribePush = async (payload: {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+  userAgent?: string
+}) => {
+  const result = await request<{ subscriptionId: string }>(
+    "/api/push/subscribe",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  )
+  return result.data
+}
+
+export const apiUnsubscribePush = async (endpoint: string) => {
+  const result = await request<{ deleted: boolean }>("/api/push/subscribe", {
+    method: "DELETE",
+    body: JSON.stringify({ endpoint }),
+  })
   return result.data
 }
 
