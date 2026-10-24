@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client"
+import { DemandStatus, UserRole } from "@prisma/client"
 
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
@@ -99,6 +99,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       participants: { include: { user: true } },
     },
   })
+
+  // Cancelamento automático (§5.4): deliveries ainda PENDING da demanda não devem sair.
+  // Best-effort — o scheduler re-verifica o status antes de enviar (segunda camada);
+  // uma falha aqui não pode quebrar a resposta do update de status.
+  if (nextStatus === DemandStatus.DONE || nextStatus === DemandStatus.CANCELLED) {
+    try {
+      await prisma.notificationDelivery.updateMany({
+        where: {
+          status: "PENDING",
+          notification: { demandId: demand.id },
+        },
+        data: { status: "CANCELLED" },
+      })
+    } catch {
+      // Silencioso de propósito: ver comentário acima.
+    }
+  }
 
   const dto = toDemandDto(updated)
 
