@@ -2,7 +2,9 @@ import { afterAll, beforeEach, describe, expect, it, jest } from "@jest/globals"
 import { DemandStatus } from "@prisma/client"
 
 import { notify } from "@/lib/notifications/dispatcher"
+import { addHours, hourBucket } from "@/lib/notifications/events"
 import { dispatchPendingNotifications } from "@/lib/notifications/scheduler"
+import type { NotificationEventType } from "@/lib/notifications/types"
 import { prisma } from "@/lib/server/prisma"
 
 // As factories não podem referenciar variáveis externas (hoisting do jest.mock):
@@ -12,6 +14,9 @@ jest.mock("@/lib/server/prisma", () => ({
     demand: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+    },
+    notification: {
+      findMany: jest.fn(),
     },
   },
 }))
@@ -32,7 +37,8 @@ type SchedulerDemand = {
   fimPrevisto: Date
   local: string
   descricao: string
-  technician: { id: string }
+  createdById: string
+  technician: { id: string; name: string }
   participants: Array<{ user: { id: string } }>
 }
 
@@ -42,10 +48,21 @@ type FreshDemand = {
   deletedAt: Date | null
 }
 
+type SchedulerNotification = {
+  id: string
+  userId: string
+  type: NotificationEventType
+  readAt: Date | null
+  createdAt: Date
+}
+
 type PrismaMock = {
   demand: {
     findMany: AsyncMock<SchedulerDemand[]>
     findUnique: AsyncMock<FreshDemand | null>
+  }
+  notification: {
+    findMany: AsyncMock<SchedulerNotification[]>
   }
 }
 
@@ -58,6 +75,9 @@ const NOW = new Date("2026-10-24T12:00:00.000Z")
 const inMinutes = (minutes: number): Date =>
   new Date(NOW.getTime() + minutes * 60_000)
 
+const inHours = (hours: number): Date =>
+  new Date(NOW.getTime() + hours * 3_600_000)
+
 const buildDemand = (
   overrides: Partial<SchedulerDemand> = {}
 ): SchedulerDemand => ({
@@ -68,7 +88,8 @@ const buildDemand = (
   fimPrevisto: inMinutes(60),
   local: "Subestação X",
   descricao: "Manutenção preventiva",
-  technician: { id: "user-1" },
+  createdById: "manager-1",
+  technician: { id: "user-1", name: "João" },
   participants: [],
   ...overrides,
 })
@@ -80,14 +101,30 @@ const buildFresh = (overrides: Partial<FreshDemand> = {}): FreshDemand => ({
   ...overrides,
 })
 
+const buildNotification = (
+  overrides: Partial<SchedulerNotification> = {}
+): SchedulerNotification => ({
+  id: "notification-1",
+  userId: "user-1",
+  type: "DEMAND_CREATED",
+  readAt: null,
+  createdAt: inHours(-3),
+  ...overrides,
+})
+
 const originalWindowMinutes = process.env.NOTIFY_UPCOMING_MINUTES
+const originalEscalationHours = process.env.NOTIFY_ESCALATION_HOURS
+const originalFinishMaxHours = process.env.NOTIFY_FINISH_MAX_HOURS
 
 beforeEach(() => {
   process.env.NOTIFY_UPCOMING_MINUTES = "15"
+  process.env.NOTIFY_ESCALATION_HOURS = "2"
+  process.env.NOTIFY_FINISH_MAX_HOURS = "24"
   jest.resetAllMocks()
 
   prismaMock.demand.findMany.mockResolvedValue([])
   prismaMock.demand.findUnique.mockResolvedValue(buildFresh())
+  prismaMock.notification.findMany.mockResolvedValue([])
   notifyMock.mockResolvedValue({
     skipped: false,
     notificationId: "notification-1",
@@ -101,7 +138,27 @@ afterAll(() => {
   } else {
     process.env.NOTIFY_UPCOMING_MINUTES = originalWindowMinutes
   }
+
+  if (originalEscalationHours === undefined) {
+    delete process.env.NOTIFY_ESCALATION_HOURS
+  } else {
+    process.env.NOTIFY_ESCALATION_HOURS = originalEscalationHours
+  }
+
+  if (originalFinishMaxHours === undefined) {
+    delete process.env.NOTIFY_FINISH_MAX_HOURS
+  } else {
+    process.env.NOTIFY_FINISH_MAX_HOURS = originalFinishMaxHours
+  }
 })
+
+const EMPTY_RESULT = {
+  dispatched: 0,
+  skipped: 0,
+  failed: 0,
+  escalated: 0,
+  escalatedSkipped: 0,
+}
 
 describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
   it("não envia nada quando a demanda virou DONE na re-verificação", async () => {
@@ -113,7 +170,7 @@ describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
     const result = await dispatchPendingNotifications(NOW)
 
     expect(notifyMock).not.toHaveBeenCalled()
-    expect(result).toEqual({ dispatched: 0, skipped: 0, failed: 0 })
+    expect(result).toEqual(EMPTY_RESULT)
   })
 
   it("não envia nada quando a demanda virou CANCELLED na re-verificação", async () => {
@@ -125,7 +182,7 @@ describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
     const result = await dispatchPendingNotifications(NOW)
 
     expect(notifyMock).not.toHaveBeenCalled()
-    expect(result).toEqual({ dispatched: 0, skipped: 0, failed: 0 })
+    expect(result).toEqual(EMPTY_RESULT)
   })
 
   it("não envia nada quando a demanda foi deletada na re-verificação", async () => {
@@ -137,7 +194,7 @@ describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
     const result = await dispatchPendingNotifications(NOW)
 
     expect(notifyMock).not.toHaveBeenCalled()
-    expect(result).toEqual({ dispatched: 0, skipped: 0, failed: 0 })
+    expect(result).toEqual(EMPTY_RESULT)
   })
 
   it("não envia nada quando a demanda não existe mais", async () => {
@@ -147,7 +204,7 @@ describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
     const result = await dispatchPendingNotifications(NOW)
 
     expect(notifyMock).not.toHaveBeenCalled()
-    expect(result).toEqual({ dispatched: 0, skipped: 0, failed: 0 })
+    expect(result).toEqual(EMPTY_RESULT)
   })
 })
 
@@ -161,7 +218,7 @@ describe("dispatchPendingNotifications — envio", () => {
     expect(notifyMock).toHaveBeenCalledWith({
       userId: "user-1",
       type: "SERVICE_UPCOMING",
-      priority: "NORMAL",
+      priority: "CRITICAL",
       demandId: "demand-1",
       content: {
         title: "Serviço começa em instantes",
@@ -171,7 +228,7 @@ describe("dispatchPendingNotifications — envio", () => {
       },
       dedupeKey: "SERVICE_UPCOMING:demand-1:user-1",
     })
-    expect(result).toEqual({ dispatched: 1, skipped: 0, failed: 0 })
+    expect(result).toEqual({ ...EMPTY_RESULT, dispatched: 1 })
   })
 
   it("notifica SERVICE_FINISH_REMINDER quando o fim previsto já venceu", async () => {
@@ -189,11 +246,12 @@ describe("dispatchPendingNotifications — envio", () => {
       expect.objectContaining({
         userId: "user-1",
         type: "SERVICE_FINISH_REMINDER",
+        priority: "CRITICAL",
         demandId: "demand-1",
-        dedupeKey: "SERVICE_FINISH_REMINDER:demand-1:user-1",
+        dedupeKey: `SERVICE_FINISH_REMINDER:demand-1:user-1:${hourBucket(NOW)}`,
       })
     )
-    expect(result).toEqual({ dispatched: 1, skipped: 0, failed: 0 })
+    expect(result).toEqual({ ...EMPTY_RESULT, dispatched: 1 })
   })
 
   it("notifica técnico e participante (um notify por destinatário)", async () => {
@@ -218,7 +276,7 @@ describe("dispatchPendingNotifications — envio", () => {
         dedupeKey: "SERVICE_UPCOMING:demand-1:user-2",
       })
     )
-    expect(result).toEqual({ dispatched: 2, skipped: 0, failed: 0 })
+    expect(result).toEqual({ ...EMPTY_RESULT, dispatched: 2 })
   })
 
   it("conta skipped quando o dispatcher retorna skipped (idempotência)", async () => {
@@ -231,13 +289,13 @@ describe("dispatchPendingNotifications — envio", () => {
 
     const result = await dispatchPendingNotifications(NOW)
 
-    expect(result).toEqual({ dispatched: 0, skipped: 1, failed: 0 })
+    expect(result).toEqual({ ...EMPTY_RESULT, skipped: 1 })
   })
 
   it("conta failed e continua a varredura quando o notify lança", async () => {
     prismaMock.demand.findMany.mockResolvedValue([
-      buildDemand({ id: "demand-1", technician: { id: "user-1" } }),
-      buildDemand({ id: "demand-2", technician: { id: "user-2" } }),
+      buildDemand({ id: "demand-1", technician: { id: "user-1", name: "João" } }),
+      buildDemand({ id: "demand-2", technician: { id: "user-2", name: "Carlos" } }),
     ])
     prismaMock.demand.findUnique
       .mockResolvedValueOnce(buildFresh({ id: "demand-1" }))
@@ -253,6 +311,172 @@ describe("dispatchPendingNotifications — envio", () => {
     const result = await dispatchPendingNotifications(NOW)
 
     expect(notifyMock).toHaveBeenCalledTimes(2)
-    expect(result).toEqual({ dispatched: 1, skipped: 0, failed: 1 })
+    expect(result).toEqual({ ...EMPTY_RESULT, dispatched: 1, failed: 1 })
+  })
+})
+
+describe("dispatchPendingNotifications — lembrete recorrente", () => {
+  it("usa o bucket de hora no dedupeKey do lembrete de finalização", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([
+      buildDemand({
+        inicioPrevisto: inMinutes(-30),
+        fimPrevisto: inMinutes(-5),
+      }),
+    ])
+
+    await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SERVICE_FINISH_REMINDER",
+        priority: "CRITICAL",
+        dedupeKey: `SERVICE_FINISH_REMINDER:demand-1:user-1:${hourBucket(NOW)}`,
+      })
+    )
+  })
+
+  it("re-dispara na hora seguinte com bucket diferente", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([
+      buildDemand({
+        inicioPrevisto: inMinutes(-30),
+        fimPrevisto: inMinutes(-5),
+      }),
+    ])
+
+    await dispatchPendingNotifications(addHours(NOW, 1))
+
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupeKey: `SERVICE_FINISH_REMINDER:demand-1:user-1:${hourBucket(NOW) + 1}`,
+      })
+    )
+  })
+
+  it("conta skipped quando o lembrete da mesma hora já foi enviado", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([
+      buildDemand({
+        inicioPrevisto: inMinutes(-30),
+        fimPrevisto: inMinutes(-5),
+      }),
+    ])
+    notifyMock.mockResolvedValue({
+      skipped: true,
+      notificationId: "notification-existente",
+      channels: [],
+    })
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(result).toEqual({ ...EMPTY_RESULT, skipped: 1 })
+  })
+
+  it("não notifica demanda vencida além do teto (NOTIFY_FINISH_MAX_HOURS)", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([
+      buildDemand({ inicioPrevisto: inHours(-31), fimPrevisto: inHours(-30) }),
+    ])
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).not.toHaveBeenCalled()
+    expect(result).toEqual(EMPTY_RESULT)
+  })
+})
+
+describe("dispatchPendingNotifications — escalonamento de não-lidas", () => {
+  const activeDemand = (
+    overrides: Partial<SchedulerDemand> = {}
+  ): SchedulerDemand =>
+    buildDemand({
+      inicioPrevisto: inMinutes(60),
+      fimPrevisto: inMinutes(120),
+      ...overrides,
+    })
+
+  it("escalona para o criador quando a notificação está não lida há ≥ 2h", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([buildNotification()])
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).toHaveBeenCalledTimes(1)
+    expect(notifyMock).toHaveBeenCalledWith({
+      userId: "manager-1",
+      type: "DEMAND_UNSEEN_ESCALATION",
+      priority: "CRITICAL",
+      demandId: "demand-1",
+      content: {
+        title: "Chamado ainda não visto",
+        body: '"Manutenção preventiva" (Subestação X) está há 2h sem ser visto por João. Considere ligar ou enviar mensagem.',
+        url: "/dashboard",
+        tag: "DEMAND_UNSEEN_ESCALATION:demand-1",
+      },
+      dedupeKey: "DEMAND_UNSEEN_ESCALATION:notification-1:manager-1",
+    })
+    expect(result).toEqual({ ...EMPTY_RESULT, escalated: 1 })
+  })
+
+  it("não escalona quando a notificação é recente (< 2h)", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([
+      buildNotification({ createdAt: inHours(-1) }),
+    ])
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).not.toHaveBeenCalled()
+    expect(result).toEqual(EMPTY_RESULT)
+  })
+
+  it("não escalona quando a notificação já foi lida", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([
+      buildNotification({ readAt: inHours(-1) }),
+    ])
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).not.toHaveBeenCalled()
+    expect(result).toEqual(EMPTY_RESULT)
+  })
+
+  it("não escalona quando a demanda está DONE", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([
+      activeDemand({ status: DemandStatus.DONE }),
+    ])
+    prismaMock.demand.findUnique.mockResolvedValue(
+      buildFresh({ status: DemandStatus.DONE })
+    )
+    prismaMock.notification.findMany.mockResolvedValue([buildNotification()])
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).not.toHaveBeenCalled()
+    expect(result).toEqual(EMPTY_RESULT)
+  })
+
+  it("conta escalatedSkipped quando o escalonamento já existe (dedupe)", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([buildNotification()])
+    notifyMock.mockResolvedValue({
+      skipped: true,
+      notificationId: "notification-existente",
+      channels: [],
+    })
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(result).toEqual({ ...EMPTY_RESULT, escalatedSkipped: 1 })
+  })
+
+  it("não escalona quando o destinatário é o próprio criador", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([
+      buildNotification({ userId: "manager-1" }),
+    ])
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).not.toHaveBeenCalled()
+    expect(result).toEqual(EMPTY_RESULT)
   })
 })
