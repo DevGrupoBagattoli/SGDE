@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, BellRing, CheckCheck, Loader2 } from "lucide-react"
+import { Bell, BellRing, CheckCheck, Loader2, TriangleAlert } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -275,7 +275,13 @@ export function NotificationsBell() {
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex w-full items-start justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-900">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                      {notification.priority === "CRITICAL" ? (
+                        <TriangleAlert
+                          aria-hidden="true"
+                          className="size-3.5 shrink-0 text-destructive"
+                        />
+                      ) : null}
                       {notification.title}
                     </span>
                     {notification.readAt === null ? (
