@@ -79,6 +79,7 @@ export function UsersDashboard() {
     name: string
     role: "gestor" | "eletricista"
     password?: string
+    email?: string
   }) => {
     setGlobalError("")
     setSuccessMessage("")

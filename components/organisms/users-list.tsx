@@ -50,12 +50,19 @@ export function UsersList({ users, currentUserId, onEdit, onDelete }: UsersListP
           {users.map((user) => (
             <TableRow key={user.id}>
               <TableCell className="font-medium text-slate-900">
-                {user.name}
-                {user.id === currentUserId && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                    Você
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{user.name}</span>
+                  {user.id === currentUserId && (
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                      Você
+                    </span>
+                  )}
+                </div>
+                {user.email ? (
+                  <p className="mt-0.5 text-xs font-normal text-slate-500">
+                    {user.email}
+                  </p>
+                ) : null}
               </TableCell>
               <TableCell>
                 <span className="capitalize text-slate-600">
