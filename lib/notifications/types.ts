@@ -1,6 +1,20 @@
 export type Channel = "PUSH" | "EMAIL"
 export type Priority = "NORMAL" | "CRITICAL"
-export type NotificationEventType = "SERVICE_UPCOMING" | "SERVICE_FINISH_REMINDER"
+
+export type DemandEventType =
+  | "DEMAND_CREATED"
+  | "DEMAND_SCHEDULE_CHANGED"
+  | "DEMAND_STATUS_CHANGED"
+  | "DEMAND_CANCELLED"
+  | "DEMAND_DESCRIPTION_CHANGED"
+  | "DEMAND_DELETED"
+
+export type NotificationEventType =
+  | "SERVICE_UPCOMING"
+  | "SERVICE_FINISH_REMINDER"
+  | DemandEventType
+  | "DEMAND_ACK_CONFIRMED"
+  | "DEMAND_UNSEEN_ESCALATION"
 
 export type NotificationContent = {
   title: string
@@ -22,6 +36,7 @@ export type ChannelSendInput = {
   userId: string
   content: NotificationContent
   demandId?: string
+  priority: Priority
 }
 
 export type ChannelSendResult = {
