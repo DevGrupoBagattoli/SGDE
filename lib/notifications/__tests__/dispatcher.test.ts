@@ -274,6 +274,31 @@ describe("notify — decisão de canais e deliveries", () => {
     })
   })
 
+  it("marca delivery como FAILED quando o canal lança exceção inesperada", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      email: null,
+      pushSubscriptions: [{ id: "sub-1" }],
+    })
+    pushSendMock.mockRejectedValue(new Error("erro inesperado de banco no canal"))
+
+    const result = await notify(INPUT)
+
+    expect(result).toEqual({
+      skipped: false,
+      notificationId: "notification-1",
+      channels: ["PUSH"],
+    })
+    expect(prismaMock.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: "delivery-1" },
+      data: {
+        status: "FAILED",
+        attempts: { increment: 1 },
+        lastError: expect.stringContaining("Erro inesperado no canal PUSH"),
+        sentAt: null,
+      },
+    })
+  })
+
   it("não cria delivery quando o usuário não tem push nem e-mail", async () => {
     prismaMock.user.findUnique.mockResolvedValue({
       email: null,

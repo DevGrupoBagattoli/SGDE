@@ -42,7 +42,8 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
       deletedAt: null,
       status: { in: [DemandStatus.PENDING, DemandStatus.IN_PROGRESS] },
       OR: [
-        { inicioPrevisto: { gte: now, lte: addMinutes(now, windowMinutes) } },
+        // janela upcoming: (now, now + windowMinutes]
+        { inicioPrevisto: { gt: now, lte: addMinutes(now, windowMinutes) } },
         { fimPrevisto: { lt: now } },
       ],
     },

@@ -4,6 +4,7 @@ import { emailChannel } from "@/lib/notifications/channels/email"
 import { pushChannel } from "@/lib/notifications/channels/push"
 import type {
   Channel,
+  ChannelSendResult,
   NotificationChannel,
   NotificationInput,
   NotifyResult,
@@ -100,11 +101,26 @@ export const notify = async (input: NotificationInput): Promise<NotifyResult> =>
       select: { id: true },
     })
 
-    const result = await channelImplementations[channel].send({
-      userId: input.userId,
-      content: input.content,
-      demandId: input.demandId,
-    })
+    // Canais tratam suas próprias falhas e retornam { ok: false }; este
+    // try/catch cobre exceções inesperadas (ex.: erro de banco dentro do
+    // canal) para que o delivery não fique preso em PENDING.
+    let result: ChannelSendResult
+
+    try {
+      result = await channelImplementations[channel].send({
+        userId: input.userId,
+        content: input.content,
+        demandId: input.demandId,
+      })
+    } catch (error) {
+      result = {
+        channel,
+        ok: false,
+        error: `Erro inesperado no canal ${channel}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      }
+    }
 
     await prisma.notificationDelivery.update({
       where: { id: delivery.id },

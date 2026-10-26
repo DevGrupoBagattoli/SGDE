@@ -20,9 +20,14 @@ export const emailChannel: NotificationChannel = {
     }
 
     const apiKey = process.env.BREVO_API_KEY
+    const senderEmail = process.env.BREVO_SENDER_EMAIL
 
     if (!apiKey) {
       return { channel: "EMAIL", ok: false, error: "BREVO_API_KEY não configurada" }
+    }
+
+    if (!senderEmail) {
+      return { channel: "EMAIL", ok: false, error: "BREVO_SENDER_EMAIL não configurada" }
     }
 
     try {
@@ -36,7 +41,7 @@ export const emailChannel: NotificationChannel = {
         body: JSON.stringify({
           sender: {
             name: process.env.BREVO_SENDER_NAME || "SGDE",
-            email: process.env.BREVO_SENDER_EMAIL,
+            email: senderEmail,
           },
           to: [{ email: user.email }],
           subject: content.title,

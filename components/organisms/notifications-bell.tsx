@@ -6,13 +6,10 @@ import { Bell, BellRing, CheckCheck, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { useNotifications } from "@/hooks/use-notifications"
 import {
   apiGetVapidPublicKey,
@@ -207,8 +204,8 @@ export function NotificationsBell() {
     pushState !== "checking" && pushState !== "unsupported"
 
   return (
-    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
@@ -234,11 +231,11 @@ export function NotificationsBell() {
             </span>
           ) : null}
         </Button>
-      </DropdownMenuTrigger>
+      </PopoverTrigger>
 
-      <DropdownMenuContent
+      <PopoverContent
         align="end"
-        className="w-80 min-w-80 sm:w-96 sm:min-w-96"
+        className="w-80 min-w-80 p-1.5 sm:w-96 sm:min-w-96"
       >
         <div className="flex items-center justify-between gap-2 px-3 py-2.5">
           <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
@@ -251,7 +248,7 @@ export function NotificationsBell() {
           ) : null}
         </div>
 
-        <DropdownMenuSeparator className="my-1" />
+        <div className="-mx-1.5 my-1.5 h-px bg-border/50" />
 
         {isLoading && notifications.length === 0 ? (
           <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-slate-500">
@@ -265,28 +262,33 @@ export function NotificationsBell() {
         ) : (
           <div className="flex flex-col">
             {notifications.map((notification) => (
-              <DropdownMenuItem
+              <div
                 key={notification.id}
                 className={cn(
-                  "flex-col items-start gap-1 rounded-2xl px-3 py-2.5",
+                  "rounded-2xl px-3 py-2.5",
                   notification.readAt === null && "bg-blue-50/70"
                 )}
-                onClick={() => handleNotificationClick(notification)}
               >
-                <div className="flex w-full items-start justify-between gap-2">
-                  <span className="text-sm font-semibold text-slate-900">
-                    {notification.title}
-                  </span>
-                  {notification.readAt === null ? (
-                    <span
-                      aria-hidden="true"
-                      className="mt-1 size-2 shrink-0 rounded-full bg-blue-600"
-                    />
-                  ) : null}
-                </div>
-                <p className="w-full text-xs font-normal text-slate-600">
-                  {notification.body}
-                </p>
+                <button
+                  type="button"
+                  className="flex w-full cursor-pointer flex-col items-start gap-1 text-left"
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <div className="flex w-full items-start justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-900">
+                      {notification.title}
+                    </span>
+                    {notification.readAt === null ? (
+                      <span
+                        aria-hidden="true"
+                        className="mt-1 size-2 shrink-0 rounded-full bg-blue-600"
+                      />
+                    ) : null}
+                  </div>
+                  <p className="w-full text-xs font-normal text-slate-600">
+                    {notification.body}
+                  </p>
+                </button>
                 <div className="flex w-full items-center justify-between gap-2 pt-0.5">
                   <span className="text-xs font-normal text-slate-400">
                     {formatRelativeTime(notification.createdAt)}
@@ -303,15 +305,12 @@ export function NotificationsBell() {
                         ? "bg-emerald-50 text-emerald-700"
                         : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     )}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void handleAck(notification)
-                    }}
+                    onClick={() => void handleAck(notification)}
                   >
                     {notification.ackAt ? "Ciente ✓" : "Ciente"}
                   </button>
                 </div>
-              </DropdownMenuItem>
+              </div>
             ))}
           </div>
         )}
@@ -322,23 +321,24 @@ export function NotificationsBell() {
           </p>
         ) : null}
 
-        <DropdownMenuSeparator className="my-1" />
+        <div className="-mx-1.5 my-1.5 h-px bg-border/50" />
 
-        <DropdownMenuItem
+        <button
+          type="button"
           disabled={unreadCount === 0 || isLoading}
-          className="justify-center text-slate-700"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50"
           onClick={() => void handleReadAll()}
         >
           <CheckCheck className="size-4" />
           Marcar todas como lidas
-        </DropdownMenuItem>
+        </button>
 
         {showActivationSection ? (
           <>
-            <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <div className="-mx-1.5 my-1.5 h-px bg-border/50" />
+            <div className="px-3 py-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
               Notificações push neste dispositivo
-            </DropdownMenuLabel>
+            </div>
             <div className="px-3 pb-3">
               {pushState === "subscribed" ? (
                 <div className="flex items-center justify-between gap-2">
@@ -357,13 +357,14 @@ export function NotificationsBell() {
                 </div>
               ) : pushState === "denied" ? (
                 <p className="text-xs text-slate-600">
-                  Notificações bloqueadas neste navegador. Libere em{" "}
-                  <a
-                    className="font-medium text-blue-700 underline"
-                    href="chrome://settings/content/notifications"
-                  >
+                  Notificações bloqueadas neste navegador. Libere as permissões de
+                  notificações deste site nas configurações do navegador — no
+                  Chrome/Edge:{" "}
+                  <span className="font-medium">
                     chrome://settings/content/notifications
-                  </a>
+                  </span>{" "}
+                  (digitado na barra de endereço); no Firefox: Configurações →
+                  Privacidade e Segurança → Permissões → Notificações.
                 </p>
               ) : (
                 <Button
@@ -390,7 +391,7 @@ export function NotificationsBell() {
             </div>
           </>
         ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverContent>
+    </Popover>
   )
 }

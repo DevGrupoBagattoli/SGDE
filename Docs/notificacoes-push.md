@@ -351,6 +351,7 @@ export const notify = async (input: NotificationInput): Promise<NotifyResult> =>
   // 5. Para cada canal:
   //       delivery = prisma.notificationDelivery.create({ channel, status: PENDING })
   //       result = await channelImpl.send({ userId, content, demandId })
+  //       (send envolvido em try/catch: exceção inesperada vira FAILED — delivery nunca fica PENDING)
   //       delivery.update({ status: result.ok ? "SENT" : "FAILED",
   //                         attempts: { increment: 1 }, lastError: result.error,
   //                         sentAt: result.ok ? new Date() : null })
@@ -424,6 +425,7 @@ export const emailChannel: NotificationChannel = {
 
     const apiKey = process.env.BREVO_API_KEY
     if (!apiKey) return { channel: "EMAIL", ok: false, error: "BREVO_API_KEY não configurada" }
+    if (!process.env.BREVO_SENDER_EMAIL) return { channel: "EMAIL", ok: false, error: "BREVO_SENDER_EMAIL não configurada" }
 
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -465,7 +467,7 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
       deletedAt: null,
       status: { in: [DemandStatus.PENDING, DemandStatus.IN_PROGRESS] },
       OR: [
-        { inicioPrevisto: { gte: now, lte: addMinutes(now, windowMinutes) } },  // janela upcoming
+        { inicioPrevisto: { gt: now, lte: addMinutes(now, windowMinutes) } },  // janela upcoming: (now, now+windowMinutes]
         { fimPrevisto: { lt: now } },                                            // overdue
       ],
     },
@@ -784,7 +786,7 @@ Adicionar header para o SW nunca ficar preso em cache agressivo de CDN:
 
 | Arquivo | Papel |
 |---|---|
-| `components/organisms/notifications-bell.tsx` | Sino no header + badge de não lidas + dropdown (shadcn `dropdown-menu`) com lista, "Ciente", "Marcar todas como lidas" e seção de ativação |
+| `components/organisms/notifications-bell.tsx` | Sino no header + badge de não lidas + painel (shadcn `popover`) com lista, "Ciente", "Marcar todas como lidas" e seção de ativação |
 | `hooks/use-notifications.ts` | Poll de `unread-count` (60s) + refresh em focus + refresh via mensagem do SW (`NOTIFICATION_RECEIVED`); ações `markRead`, `readAll`, `ack`; carrega lista ao abrir o painel |
 | `lib/push.ts` (client helper) | `urlBase64ToUint8Array`, `subscribeToPush(publicKey)` (permission + subscribe + `toJSON()`), `unsubscribeFromPush()` |
 
@@ -801,8 +803,10 @@ Estado possíveis do navegador:
   unsupported     → sem "serviceWorker" ou sem "PushManager" → painel esconde a seção
   default (não perguntado) → botão "Ativar notificações"
   granted + subscribed     → "✓ Notificações ativas neste dispositivo" + botão "Desativar"
-  denied                   → texto: "Notificações bloqueadas neste navegador.
-                             Libere em chrome://settings/content/notifications" (link)
+  denied                   → texto: "Notificações bloqueadas neste navegador. Libere as permissões de
+                              notificações deste site nas configurações do navegador" (texto simples, sem link —
+                              navegadores bloqueiam navegação para chrome://; o painel cita o caminho
+                              chrome://settings/content/notifications para digitar na barra de endereço)
 ```
 
 Ativar:
@@ -812,7 +816,7 @@ Ativar:
 
 Desativar: `subscription.unsubscribe()` (browser) + `DELETE /api/push/subscribe` (banco).
 
-### 8.4 Painel (dropdown)
+### 8.4 Painel (popover)
 
 - Lista: título, corpo, tempo relativo ("há 5 min"), item não lido em destaque.
 - Clique no item → `POST .../read` + navegar para `data.url` (dashboard).
