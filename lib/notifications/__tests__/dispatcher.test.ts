@@ -96,22 +96,76 @@ beforeEach(() => {
   emailSendMock.mockResolvedValue({ channel: "EMAIL", ok: true })
 })
 
-describe("decideChannels", () => {
+describe("decideChannels — NORMAL", () => {
   it("usa PUSH quando há subscription ativa (mesmo com e-mail cadastrado)", () => {
     expect(
-      decideChannels({ hasPushSubscriptions: true, hasEmail: true })
+      decideChannels({
+        hasPushSubscriptions: true,
+        hasEmail: true,
+        priority: "NORMAL",
+      })
     ).toEqual(["PUSH"])
   })
 
   it("usa EMAIL quando não há push mas há e-mail (fallback)", () => {
     expect(
-      decideChannels({ hasPushSubscriptions: false, hasEmail: true })
+      decideChannels({
+        hasPushSubscriptions: false,
+        hasEmail: true,
+        priority: "NORMAL",
+      })
     ).toEqual(["EMAIL"])
   })
 
   it("não decide canal quando não há push nem e-mail", () => {
     expect(
-      decideChannels({ hasPushSubscriptions: false, hasEmail: false })
+      decideChannels({
+        hasPushSubscriptions: false,
+        hasEmail: false,
+        priority: "NORMAL",
+      })
+    ).toEqual([])
+  })
+})
+
+describe("decideChannels — CRITICAL", () => {
+  it("usa PUSH e EMAIL quando ambos estão disponíveis", () => {
+    expect(
+      decideChannels({
+        hasPushSubscriptions: true,
+        hasEmail: true,
+        priority: "CRITICAL",
+      })
+    ).toEqual(["PUSH", "EMAIL"])
+  })
+
+  it("usa somente PUSH quando não há e-mail", () => {
+    expect(
+      decideChannels({
+        hasPushSubscriptions: true,
+        hasEmail: false,
+        priority: "CRITICAL",
+      })
+    ).toEqual(["PUSH"])
+  })
+
+  it("usa somente EMAIL quando não há push", () => {
+    expect(
+      decideChannels({
+        hasPushSubscriptions: false,
+        hasEmail: true,
+        priority: "CRITICAL",
+      })
+    ).toEqual(["EMAIL"])
+  })
+
+  it("não decide canal quando não há push nem e-mail", () => {
+    expect(
+      decideChannels({
+        hasPushSubscriptions: false,
+        hasEmail: false,
+        priority: "CRITICAL",
+      })
     ).toEqual([])
   })
 })
@@ -223,6 +277,7 @@ describe("notify — decisão de canais e deliveries", () => {
       userId: "user-1",
       content: INPUT.content,
       demandId: "demand-1",
+      priority: "NORMAL",
     })
     expect(prismaMock.notificationDelivery.update).toHaveBeenCalledWith({
       where: { id: "delivery-1" },
@@ -232,6 +287,50 @@ describe("notify — decisão de canais e deliveries", () => {
         lastError: null,
         sentAt: expect.any(Date),
       },
+    })
+  })
+
+  it("cria 2 deliveries (PUSH e EMAIL) quando CRITICAL e ambos os canais estão disponíveis", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      email: "eletricista@example.com",
+      pushSubscriptions: [{ id: "sub-1" }],
+    })
+
+    const result = await notify({ ...INPUT, priority: "CRITICAL" })
+
+    expect(result).toEqual({
+      skipped: false,
+      notificationId: "notification-1",
+      channels: ["PUSH", "EMAIL"],
+    })
+    expect(prismaMock.notificationDelivery.create).toHaveBeenCalledTimes(2)
+    expect(prismaMock.notificationDelivery.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        notificationId: "notification-1",
+        channel: "PUSH",
+        status: "PENDING",
+      },
+      select: { id: true },
+    })
+    expect(prismaMock.notificationDelivery.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        notificationId: "notification-1",
+        channel: "EMAIL",
+        status: "PENDING",
+      },
+      select: { id: true },
+    })
+    expect(pushSendMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      content: INPUT.content,
+      demandId: "demand-1",
+      priority: "CRITICAL",
+    })
+    expect(emailSendMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      content: INPUT.content,
+      demandId: "demand-1",
+      priority: "CRITICAL",
     })
   })
 

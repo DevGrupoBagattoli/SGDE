@@ -1,9 +1,15 @@
 import { DemandStatus, UserRole } from "@prisma/client"
 
+import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
-import { toDemandDto, updateStatusSchema, demandStatusToDb } from "@/lib/server/demands"
+import {
+  toDemandDto,
+  updateStatusSchema,
+  demandStatusToDb,
+  demandStatusFromDb,
+} from "@/lib/server/demands"
 import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -116,6 +122,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       // Silencioso de propósito: ver comentário acima.
     }
   }
+
+  // ORDEM CRÍTICA: o cancelamento de deliveries PENDING acima precisa vir ANTES
+  // deste hook — senão o delivery da notificação nova também nasceria cancelado.
+  await notifyDemandEvent({
+    type: nextStatus === DemandStatus.CANCELLED ? "DEMAND_CANCELLED" : "DEMAND_STATUS_CHANGED",
+    demand: updated,
+    actorId: auth.user.id,
+    actorName: auth.user.name,
+    statusLabel: demandStatusFromDb(nextStatus),
+  })
 
   const dto = toDemandDto(updated)
 

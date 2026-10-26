@@ -42,7 +42,7 @@ const describeError = (error: unknown): string => {
 
 export const pushChannel: NotificationChannel = {
   channel: "PUSH",
-  async send({ userId, content }: ChannelSendInput): Promise<ChannelSendResult> {
+  async send({ userId, content, priority }: ChannelSendInput): Promise<ChannelSendResult> {
     try {
       configureVapid()
     } catch (error) {
@@ -57,7 +57,10 @@ export const pushChannel: NotificationChannel = {
       return { channel: "PUSH", ok: false, error: "Nenhuma subscription ativa" }
     }
 
-    const payload = JSON.stringify(content)
+    const payload = JSON.stringify({
+      ...content,
+      requireInteraction: priority === "CRITICAL",
+    })
 
     // `async` no map converte throws síncronos do web-push em rejeições,
     // garantindo que o allSettled capture todas as falhas.

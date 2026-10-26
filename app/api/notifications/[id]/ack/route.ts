@@ -1,3 +1,4 @@
+import { notifyDemandAck } from "@/lib/notifications/demand-events"
 import { requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { jsonError, jsonOk } from "@/lib/server/http"
@@ -24,7 +25,7 @@ export async function POST(_: Request, { params }: RouteParams) {
 
   const notification = await prisma.notification.findFirst({
     where: { id, userId: auth.user.id },
-    select: { id: true, readAt: true },
+    select: { id: true, readAt: true, ackAt: true, demandId: true },
   })
 
   if (!notification) {
@@ -33,6 +34,7 @@ export async function POST(_: Request, { params }: RouteParams) {
     })
   }
 
+  const isFirstAck = notification.ackAt === null
   const ackAt = new Date()
   const readAt = notification.readAt ?? ackAt
 
@@ -40,6 +42,15 @@ export async function POST(_: Request, { params }: RouteParams) {
     where: { id: notification.id },
     data: { ackAt, readAt },
   })
+
+  if (isFirstAck && notification.demandId) {
+    await notifyDemandAck({
+      notificationId: notification.id,
+      demandId: notification.demandId,
+      ackUserId: auth.user.id,
+      ackUserName: auth.user.name,
+    })
+  }
 
   return jsonOk({
     notificationId: notification.id,
