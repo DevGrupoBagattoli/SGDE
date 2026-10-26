@@ -87,6 +87,17 @@ export function NotificationsBell() {
 
     try {
       const subscription = await getCurrentPushSubscription()
+
+      // A subscription é do navegador, não do usuário: reenvia para o servidor
+      // vincular o dispositivo a quem está logado agora (troca de conta no mesmo aparelho).
+      if (subscription?.endpoint && subscription.keys?.p256dh && subscription.keys.auth) {
+        await apiSubscribePush({
+          endpoint: subscription.endpoint,
+          keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+          userAgent: navigator.userAgent,
+        }).catch(() => {})
+      }
+
       setPushState(subscription ? "subscribed" : "default")
     } catch {
       setPushState("default")

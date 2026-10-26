@@ -23,6 +23,7 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico|jpg|jpeg|webp|gif|woff2)$).*)",
+    // sw.js e manifest ficam fora: o navegador recusa service worker servido via redirect.
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|.*\\.(?:svg|png|ico|jpg|jpeg|webp|gif|woff2)$).*)",
   ],
 }
