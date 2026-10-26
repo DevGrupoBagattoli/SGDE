@@ -190,6 +190,7 @@ model PushSubscription {
   p256dh     String                      // chave pública da subscription
   auth       String                      // segredo da subscription
   userAgent  String?                     // identificação do dispositivo (debug)
+  revokedAt  DateTime?                   // revogação explícita (canal filtra revokedAt: null)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   lastSeenAt DateTime?
@@ -205,6 +206,7 @@ model PushSubscription {
 - `readAt`/`ackAt` vivem em `Notification` (o usuário lê/confirma **a notificação**, não o canal). O delivery guarda o que é por canal: `status`, `attempts`, `lastError`, `sentAt`.
 - `User.email` opcional + `@unique` (PostgreSQL permite múltiplos `NULL`). Normalizar no cadastro: trim + lowercase.
 - `PushSubscription.endpoint @unique`: upsert por endpoint. Se outro usuário logar no mesmo navegador e ativar, a subscription é **reassociada** ao usuário atual.
+- `PushSubscription.revokedAt`: reservado para revogação explícita (Fase 2). Na Fase 1 nada o define; o canal push consulta `revokedAt: null` e remove subscriptions expiradas (404/410) direto na tabela.
 - Migration: `pnpm db:migrate` → nome sugerido: `notifications`.
 - `onDelete: Cascade` em `PushSubscription` e `Notification` → remover usuário limpa tudo.
 
@@ -329,7 +331,7 @@ export const buildNotificationContent = (
 | `SERVICE_FINISH_REMINDER` | `Serviço pendente de finalização` | `"${descricao}" passou do horário de fim previsto. Finalize no sistema.` | `SERVICE_FINISH_REMINDER:{demandId}` |
 
 - `url`: `"/dashboard"` (futuro: link direto ao dia/demanda).
-- Horário: reutilizar o padrão de formatação existente (ver `lib/server/dates.ts`); se não houver helper adequado, `Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" })` — **atenção ao timezone** (datas em UTC no banco; usuários no Brasil).
+- Horário: implementado com `Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })` — **fuso fixo** para que o horário exibido não mude conforme o fuso do servidor (container em UTC mostraria 11:00 para um serviço previsto às 08:00 no Brasil).
 
 ### 4.4 `dispatcher.ts`
 
@@ -492,7 +494,7 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
           content: buildNotificationContent("SERVICE_UPCOMING", demand),
           dedupeKey: buildDedupeKey("SERVICE_UPCOMING", demand.id, recipient.id),
         })
-        r.skipped ? skipped++ : dispatched++  // failed contabilizado dentro do notify
+        r.skipped ? skipped++ : dispatched++  // failed++ quando notify() lança (try/catch por evento)
       }
       if (overdue) {
         const r = await notify({
@@ -512,11 +514,13 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
 }
 ```
 
+> **Contadores**: `dispatched` = notificação nova criada; `skipped` = já existia (idempotência); `failed` = `notify()` lançou exceção (cada chamada é isolada em try/catch para não abortar a varredura). Falhas de canal não lançam — viram delivery `FAILED` e contam como `dispatched`.
+
 ---
 
 ## 5. Contratos de API
 
-Todos seguem o padrão atual: helpers `jsonOk`/`jsonError` (`lib/server/http.ts`), `requireAuth()` e `validateCsrf()` em mutações. Mensagens de erro em PT-BR, códigos UPPER_SNAKE_CASE.
+Todos seguem o padrão atual: helpers `jsonOk`/`jsonError` (`lib/server/http.ts`), `requireAuth()` e `validateCsrf()` em mutações. Mensagens de erro em PT-BR, códigos UPPER_SNAKE_CASE. Os códigos `VAPID_NOT_CONFIGURED` e `CRON_NOT_CONFIGURED` foram adicionados ao union `ApiErrorCode` de `lib/server/http.ts`.
 
 ### 5.1 Subscriptions de push
 
@@ -574,10 +578,16 @@ Todos seguem o padrão atual: helpers `jsonOk`/`jsonError` (`lib/server/http.ts`
 ```
 
 **`POST /api/notifications/[id]/read`** (auth + CSRF) — marca `readAt = now` (idempotente: já lida → 200 sem efeito). Só o dono (de outro usuário → 404 `NOT_FOUND`, sem vazar existência).
+```json
+{ "success": true, "data": { "notificationId": "clx...", "readAt": "2026-10-24T10:50:00.000Z" } }
+```
 
 **`POST /api/notifications/read-all`** (auth + CSRF) — `updateMany({ userId, readAt: null })` → `{ "updatedCount": N }`.
 
 **`POST /api/notifications/[id]/ack`** (auth + CSRF) — botão "Ciente": seta `ackAt = now` e `readAt` (se null).
+```json
+{ "success": true, "data": { "notificationId": "clx...", "ackAt": "2026-10-24T10:52:00.000Z", "readAt": "2026-10-24T10:50:00.000Z" } }
+```
 
 ### 5.3 Agendador
 
@@ -748,8 +758,10 @@ Montar dentro de `app/layout.tsx` (junto ao `ThemeProvider`).
 
 Gerar a partir do logo existente (`public/bagattoli-tech-logo.png`) com `sharp` (devDependency):
 
-- `public/icons/icon-192.png` e `public/icons/icon-512.png` — logo centrada (90%) em fundo sólido do tema
+- `public/icons/icon-192.png` e `public/icons/icon-512.png` — logo centrada (90%) em fundo sólido
 - `public/icons/icon-192-maskable.png` e `public/icons/icon-512-maskable.png` — com safe area (~75% de conteúdo, pois o Android pode recortar em formas variadas)
+
+> **Fundo dos ícones**: o logo é escuro (preto + verde-lima) e ficaria ilegível sobre o fundo escuro `#09090b` do manifest; os ícones usam fundo branco (`#ffffff`, `--background` do tema claro) para manter a marca legível. As cores do manifest permanecem `#09090b`.
 
 Script npm: `"icons:generate": "node scripts/generate-icons.mjs"`. Os PNGs gerados **entram no commit** (o script serve para regenerar quando a arte mudar). Arte-final pode substituir depois — os caminhos são o contrato.
 
@@ -809,9 +821,9 @@ Desativar: `subscription.unsubscribe()` (browser) + `DELETE /api/push/subscribe`
 
 ### 8.5 E-mail no CRUD de usuários (campo opcional)
 
-- `lib/server/users.ts`: adicionar `email` opcional ao schema Zod (formato email, trim + lowercase, único).
-- `app/api/users` (POST/PATCH): passar o campo; erro 409/422 amigável para e-mail duplicado.
-- `components/organisms/user-modal.tsx` + `users-list.tsx`: campo "E-mail (para notificações)" opcional.
+- `lib/server/users.ts`: `email` opcional no schema Zod (formato email, trim + lowercase, máx 254, único). String vazia é aceita e significa "sem e-mail".
+- `app/api/users` (POST/PATCH): persiste o campo; no PATCH, `""` limpa para `null`; e-mail duplicado → 409 `CONFLICT` (P2002 com `meta.target` contendo `email`); formato inválido → 422.
+- `components/organisms/user-modal.tsx` + `users-list.tsx`: campo "E-mail (para notificações)" opcional com validação inline; a lista exibe o e-mail quando cadastrado.
 - Se o gestor não preencher, apenas não recebe fallback de e-mail (push continua funcionando).
 
 ---
