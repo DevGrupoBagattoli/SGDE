@@ -8,6 +8,7 @@ import type {
   NotificationChannel,
   NotificationInput,
   NotifyResult,
+  Priority,
 } from "@/lib/notifications/types"
 import { prisma } from "@/lib/server/prisma"
 
@@ -20,12 +21,20 @@ const channelImplementations: Record<Channel, NotificationChannel> = {
 const isUniqueConstraintError = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
 
-/** Decisão de canais (Fase 1): push quando há subscription ativa; senão e-mail; senão nada. */
+/** Decisão de canais: CRITICAL = push E e-mail (cada um se disponível); NORMAL = push, senão e-mail. */
 export const decideChannels = (input: {
   hasPushSubscriptions: boolean
   hasEmail: boolean
-}): Channel[] =>
-  input.hasPushSubscriptions ? ["PUSH"] : input.hasEmail ? ["EMAIL"] : []
+  priority: Priority
+}): Channel[] => {
+  if (input.priority === "CRITICAL") {
+    const channels: Channel[] = []
+    if (input.hasPushSubscriptions) channels.push("PUSH")
+    if (input.hasEmail) channels.push("EMAIL")
+    return channels
+  }
+  return input.hasPushSubscriptions ? ["PUSH"] : input.hasEmail ? ["EMAIL"] : []
+}
 
 export const notify = async (input: NotificationInput): Promise<NotifyResult> => {
   // 1. Idempotência: a unique constraint em dedupeKey é a rede de segurança
@@ -92,6 +101,7 @@ export const notify = async (input: NotificationInput): Promise<NotifyResult> =>
   const channels = decideChannels({
     hasPushSubscriptions: (user?.pushSubscriptions.length ?? 0) > 0,
     hasEmail: Boolean(user?.email),
+    priority: input.priority,
   })
 
   // 5. Registra e executa um delivery por canal.
@@ -111,6 +121,7 @@ export const notify = async (input: NotificationInput): Promise<NotifyResult> =>
         userId: input.userId,
         content: input.content,
         demandId: input.demandId,
+        priority: input.priority,
       })
     } catch (error) {
       result = {
