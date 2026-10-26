@@ -11,7 +11,7 @@ export type DemandEventContext = {
   actorName?: string      // quem fez a alteração (eventos de demanda)
   statusLabel?: string    // "Pendente" | "Em Andamento" | ... (demandStatusFromDb)
   userName?: string       // quem clicou "Ciente" (ack)
-  technicianName?: string // técnico que não viu (escalonamento)
+  unseenUserName?: string // destinatário que não leu a notificação (escalonamento)
   unseenHours?: number    // horas sem leitura (escalonamento)
 }
 
@@ -100,7 +100,7 @@ export const buildNotificationContent = (
     case "DEMAND_UNSEEN_ESCALATION":
       return {
         title: "Chamado ainda não visto",
-        body: `"${demand.descricao}" (${demand.local}) está há ${context.unseenHours}h sem ser visto por ${context.technicianName}. Considere ligar ou enviar mensagem.`,
+        body: `"${demand.descricao}" (${demand.local}) está há ${context.unseenHours}h sem ser visto por ${context.unseenUserName}. Considere ligar ou enviar mensagem.`,
         url: "/dashboard",
         tag,
       }

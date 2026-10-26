@@ -72,6 +72,8 @@ export const notifyDemandAck = async (input: {
       content: buildNotificationContent("DEMAND_ACK_CONFIRMED", demand, {
         userName: input.ackUserName,
       }),
+      // REGISTRO (design aceito): dedupe POR NOTIFICAÇÃO, não por demanda — cada
+      // notificação confirmada gera um aviso ao criador (decisão do stakeholder).
       dedupeKey: `DEMAND_ACK_CONFIRMED:${input.notificationId}:${demand.createdById}`,
     })
   } catch (error) {

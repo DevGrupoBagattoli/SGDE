@@ -54,7 +54,7 @@ const CONTEXT = {
   actorName: "Maria",
   statusLabel: "Em Andamento",
   userName: "João",
-  technicianName: "João",
+  unseenUserName: "João",
   unseenHours: 2,
 }
 
@@ -152,7 +152,7 @@ describe("buildNotificationContent — eventos de demanda", () => {
     expect(content.url).toBe("/dashboard")
   })
 
-  it("DEMAND_UNSEEN_ESCALATION: contém technicianName e unseenHours", () => {
+  it("DEMAND_UNSEEN_ESCALATION: contém unseenUserName e unseenHours", () => {
     const content = buildNotificationContent(
       "DEMAND_UNSEEN_ESCALATION",
       DEMAND,

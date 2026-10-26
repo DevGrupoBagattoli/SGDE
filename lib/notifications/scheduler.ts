@@ -57,44 +57,82 @@ const escalateUnseenNotifications = async (now: Date) => {
   const escalationHours = resolveEscalationHours()
   const threshold = addHours(now, -escalationHours)
 
-  // Notification NÃO tem relação Prisma com Demand (só demandId escalar):
-  // parte das demandas ativas e busca as notificações não lidas de cada uma.
+  // Notification NÃO tem relação Prisma com Demand (só demandId escalar).
+  // Duas queries no total (evita N+1 — o cron varre a cada minuto):
+  // primeiro as demandas ativas, depois todas as notificações elegíveis de uma vez.
   const demands = await prisma.demand.findMany({
     where: { deletedAt: null, status: { in: [DemandStatus.PENDING, DemandStatus.IN_PROGRESS] } },
-    include: { technician: true },
+    select: {
+      id: true,
+      createdById: true,
+      status: true,
+      deletedAt: true,
+      descricao: true,
+      local: true,
+      inicioPrevisto: true,
+    },
   })
 
   const counters = { dispatched: 0, skipped: 0, failed: 0 }
 
-  for (const demand of demands) {
-    const notifications = await prisma.notification.findMany({
-      where: {
-        demandId: demand.id,
-        type: { in: [...DEMAND_EVENT_TYPES] },
-        readAt: null,
-        createdAt: { lte: threshold },
-      },
-      select: { id: true, userId: true, type: true, readAt: true, createdAt: true },
+  if (demands.length === 0) return counters
+
+  const demandsById = new Map(demands.map((demand) => [demand.id, demand]))
+
+  const notifications = await prisma.notification.findMany({
+    where: {
+      demandId: { in: demands.map((demand) => demand.id) },
+      type: { in: [...DEMAND_EVENT_TYPES] },
+      readAt: null,
+      createdAt: { lte: threshold },
+    },
+    select: {
+      id: true,
+      demandId: true,
+      userId: true,
+      type: true,
+      readAt: true,
+      createdAt: true,
+      user: { select: { name: true } },
+    },
+  })
+
+  for (const notification of notifications) {
+    if (!notification.demandId) continue // demandId é nullable no schema; a query já filtra por demandas ativas
+    const demand = demandsById.get(notification.demandId)
+    if (!demand) continue
+
+    if (!isEscalationCandidate(notification, demand, now, escalationHours)) continue
+    if (notification.userId === demand.createdById) continue // criador não escalona a si mesmo
+
+    // Idade REAL de não-leitura (não o threshold): "há 5h" quando está há 5h.
+    const unseenHours = Math.max(
+      1,
+      Math.floor((now.getTime() - notification.createdAt.getTime()) / 3_600_000)
+    )
+
+    // REGISTRO (limitação conhecida): diferente da varredura principal (que
+    // re-verifica a demanda antes de cada envio), aqui não há re-busca fresh —
+    // a demanda pode virar DONE/CANCELLED/deleted entre o findMany e o dispatch.
+    // Janela pequena e best-effort: o pior caso é um escalonamento extra;
+    // o dedupeKey por notificationId impede repetição.
+
+    // REGISTRO (design aceito): escalonamento é POR NOTIFICAÇÃO, não por demanda —
+    // N notificações não lidas da mesma demanda geram N avisos ao criador
+    // (decisão do stakeholder; rever se surgir fadiga de alerta).
+    const outcome = await dispatchEvent({
+      userId: demand.createdById,
+      type: "DEMAND_UNSEEN_ESCALATION",
+      priority: resolvePriority("DEMAND_UNSEEN_ESCALATION"),
+      demandId: demand.id,
+      content: buildNotificationContent("DEMAND_UNSEEN_ESCALATION", demand, {
+        unseenUserName: notification.user.name,
+        unseenHours,
+      }),
+      dedupeKey: `DEMAND_UNSEEN_ESCALATION:${notification.id}:${demand.createdById}`,
     })
 
-    for (const notification of notifications) {
-      if (!isEscalationCandidate(notification, demand, now, escalationHours)) continue
-      if (notification.userId === demand.createdById) continue // criador não escalona a si mesmo
-
-      const outcome = await dispatchEvent({
-        userId: demand.createdById,
-        type: "DEMAND_UNSEEN_ESCALATION",
-        priority: resolvePriority("DEMAND_UNSEEN_ESCALATION"),
-        demandId: demand.id,
-        content: buildNotificationContent("DEMAND_UNSEEN_ESCALATION", demand, {
-          technicianName: demand.technician.name,
-          unseenHours: escalationHours,
-        }),
-        dedupeKey: `DEMAND_UNSEEN_ESCALATION:${notification.id}:${demand.createdById}`,
-      })
-
-      counters[outcome]++
-    }
+    counters[outcome]++
   }
 
   return counters
@@ -177,5 +215,6 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
     failed: counters.failed,
     escalated: escalation.dispatched,
     escalatedSkipped: escalation.skipped,
+    escalatedFailed: escalation.failed,
   }
 }

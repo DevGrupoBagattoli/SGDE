@@ -417,7 +417,7 @@ export type DemandEventContext = {
   actorName?: string      // quem fez a alteração (eventos de demanda)
   statusLabel?: string    // "Pendente" | "Em Andamento" | ... (demandStatusFromDb)
   userName?: string       // quem clicou "Ciente" (ack)
-  technicianName?: string // técnico que não viu (escalonamento)
+  unseenUserName?: string // destinatário que não leu a notificação (escalonamento)
   unseenHours?: number    // horas sem leitura (escalonamento)
 }
 
@@ -439,10 +439,11 @@ export const buildNotificationContent = (
 | `DEMAND_DESCRIPTION_CHANGED` | `Descrição do chamado alterada` | `"${descricao}" (${local}): descrição alterada por ${actorName}.` | `DEMAND_DESCRIPTION_CHANGED:{demandId}` |
 | `DEMAND_DELETED` | `Chamado excluído` | `"${descricao}" (${local}) foi excluído por ${actorName}.` | `DEMAND_DELETED:{demandId}` |
 | `DEMAND_ACK_CONFIRMED` | `Chamado confirmado pelo técnico` | `${userName} está ciente do chamado "${descricao}" (${local}).` | `DEMAND_ACK_CONFIRMED:{demandId}` |
-| `DEMAND_UNSEEN_ESCALATION` | `Chamado ainda não visto` | `"${descricao}" (${local}) está há ${unseenHours}h sem ser visto por ${technicianName}. Considere ligar ou enviar mensagem.` | `DEMAND_UNSEEN_ESCALATION:{demandId}` |
+| `DEMAND_UNSEEN_ESCALATION` | `Chamado ainda não visto` | `"${descricao}" (${local}) está há ${unseenHours}h sem ser visto por ${unseenUserName}. Considere ligar ou enviar mensagem.` | `DEMAND_UNSEEN_ESCALATION:{demandId}` |
 
 - `url`: `"/dashboard"` (futuro: link direto ao dia/demanda).
 - Horário: implementado com `Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })` — **fuso fixo** para que o horário exibido não mude conforme o fuso do servidor (container em UTC mostraria 11:00 para um serviço previsto às 08:00 no Brasil).
+- `DEMAND_UNSEEN_ESCALATION`: `unseenHours` é a **idade real da não-leitura** (`floor` das horas decorridas desde `createdAt`, mínimo 1) — não o threshold de escalonamento. O nome exibido é do **destinatário que não leu** a notificação (pode ser um participante, não só o técnico).
 
 ### 4.4 `dispatcher.ts`
 
@@ -642,11 +643,12 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
     dispatched, skipped, failed,
     escalated: escalation.dispatched,
     escalatedSkipped: escalation.skipped,
+    escalatedFailed: escalation.failed,
   }
 }
 ```
 
-> **Contadores**: `dispatched` = notificação nova criada; `skipped` = já existia (idempotência); `failed` = `notify()` lançou exceção (cada chamada é isolada em try/catch para não abortar a varredura). Falhas de canal não lançam — viram delivery `FAILED` e contam como `dispatched`. `escalated` = escalonamento novo criado; `escalatedSkipped` = escalonamento já existia (dedupe por `notificationId`).
+> **Contadores**: `dispatched` = notificação nova criada; `skipped` = já existia (idempotência); `failed` = `notify()` lançou exceção (cada chamada é isolada em try/catch para não abortar a varredura). Falhas de canal não lançam — viram delivery `FAILED` e contam como `dispatched`. `escalated` = escalonamento novo criado; `escalatedSkipped` = escalonamento já existia (dedupe por `notificationId`); `escalatedFailed` = `notify()` do escalonamento lançou exceção (isolado em try/catch).
 
 ### 4.8 `demand-events.ts` (hooks das rotas — best-effort)
 
@@ -752,10 +754,10 @@ Todos seguem o padrão atual: helpers `jsonOk`/`jsonError` (`lib/server/http.ts`
 **`POST /api/cron/dispatch-notifications`** — proteção por token (header `x-cron-token` == `CRON_SECRET`):
 
 ```json
-{ "success": true, "data": { "dispatched": 2, "skipped": 1, "failed": 0, "escalated": 1, "escalatedSkipped": 0 } }
+{ "success": true, "data": { "dispatched": 2, "skipped": 1, "failed": 0, "escalated": 1, "escalatedSkipped": 0, "escalatedFailed": 0 } }
 ```
 
-- `escalated` / `escalatedSkipped`: escalonamentos de não-lidas criados / já existentes (dedupe) na varredura — ver §6.7.
+- `escalated` / `escalatedSkipped` / `escalatedFailed`: escalonamentos de não-lidas criados / já existentes (dedupe) / com falha no `notify()` na varredura — ver §6.7.
 
 - Comparação **timing-safe** (hash SHA-256 de ambos + `crypto.timingSafeEqual` — tolera tamanhos diferentes).
 - `CRON_SECRET` ausente no servidor → 500 `CRON_NOT_CONFIGURED` (fail closed).
@@ -825,6 +827,7 @@ Entre a consulta e o envio, a demanda pode virar `DONE`/`CANCELLED`. O scheduler
 - A cada varredura, o scheduler parte das **demandas ativas** (a `Notification` não tem relação Prisma com `Demand` — só `demandId` escalar) e busca notificações de eventos de demanda **não lidas** há ≥ `NOTIFY_ESCALATION_HOURS` (padrão 2).
 - Para cada notificação elegível (`isEscalationCandidate`), o **criador da demanda** recebe `DEMAND_UNSEEN_ESCALATION` — uma vez por notificação (`dedupeKey` por `notificationId`).
 - O criador não escala a si mesmo (notificação cujo destinatário é o próprio criador é ignorada).
+- O escalonamento consulta as notificações em **uma única query** (sem N+1 — o cron varre a cada minuto) e a resposta do cron inclui `escalatedFailed` (falha no `notify()` do escalonamento).
 
 ### 6.8 Gatilhos por rota (hooks best-effort)
 
@@ -1075,7 +1078,7 @@ BREVO_SENDER_NAME="SGDE"
    - Se a Scheduled Task do Coolify não rodar no container do app, substituir `$CRON_SECRET` pelo valor literal no comando.
    - `curl -fsS`: falha silenciosa vira erro visível nos logs da task.
 
-3. **Verificação**: nos logs da task deve aparecer a resposta `{"success":true,"data":{"dispatched":0,"skipped":0,"failed":0,"escalated":0,"escalatedSkipped":0}}` (ou contadores > 0 quando houver eventos). Chamar manualmente uma vez (§11.3) para validar o token.
+3. **Verificação**: nos logs da task deve aparecer a resposta `{"success":true,"data":{"dispatched":0,"skipped":0,"failed":0,"escalated":0,"escalatedSkipped":0,"escalatedFailed":0}}` (ou contadores > 0 quando houver eventos). Chamar manualmente uma vez (§11.3) para validar o token.
 
 4. Garantir que as variáveis de `§9` estejam definidas no ambiente do app no Coolify (redeploy após adicionar).
 
@@ -1136,12 +1139,12 @@ Cobertura esperada (detalhes em §4 e nos testes de `lib/notifications/__tests__
    ```bash
    curl -X POST http://localhost:3000/api/cron/dispatch-notifications \
      -H "x-cron-token: $CRON_SECRET"
-   # → {"success":true,"data":{"dispatched":1,"skipped":0,"failed":0,"escalated":0,"escalatedSkipped":0}}
+   # → {"success":true,"data":{"dispatched":1,"skipped":0,"failed":0,"escalated":0,"escalatedSkipped":0,"escalatedFailed":0}}
    ```
    A notificação deve aparecer **mesmo com a aba do SGDE fechada** (o service worker persiste). Repita com a aba fechada de propósito.
 6. **Idempotência** — rodar o mesmo curl de novo:
    ```bash
-   # → {"success":true,"data":{"dispatched":0,"skipped":1,"failed":0,"escalated":0,"escalatedSkipped":0}}
+   # → {"success":true,"data":{"dispatched":0,"skipped":1,"failed":0,"escalated":0,"escalatedSkipped":0,"escalatedFailed":0}}
    ```
    Nenhuma notificação nova. Rodar 10× → mesmo resultado.
 7. **Cenário `SERVICE_FINISH_REMINDER`** — criar demanda com `fimPrevisto` já vencido (status `PENDING`) → curl → notificação "Serviço pendente de finalização".

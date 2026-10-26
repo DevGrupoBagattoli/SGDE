@@ -50,10 +50,12 @@ type FreshDemand = {
 
 type SchedulerNotification = {
   id: string
+  demandId: string
   userId: string
   type: NotificationEventType
   readAt: Date | null
   createdAt: Date
+  user: { name: string }
 }
 
 type PrismaMock = {
@@ -105,10 +107,12 @@ const buildNotification = (
   overrides: Partial<SchedulerNotification> = {}
 ): SchedulerNotification => ({
   id: "notification-1",
+  demandId: "demand-1",
   userId: "user-1",
   type: "DEMAND_CREATED",
   readAt: null,
   createdAt: inHours(-3),
+  user: { name: "João" },
   ...overrides,
 })
 
@@ -158,6 +162,7 @@ const EMPTY_RESULT = {
   failed: 0,
   escalated: 0,
   escalatedSkipped: 0,
+  escalatedFailed: 0,
 }
 
 describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
@@ -406,7 +411,7 @@ describe("dispatchPendingNotifications — escalonamento de não-lidas", () => {
       demandId: "demand-1",
       content: {
         title: "Chamado ainda não visto",
-        body: '"Manutenção preventiva" (Subestação X) está há 2h sem ser visto por João. Considere ligar ou enviar mensagem.',
+        body: '"Manutenção preventiva" (Subestação X) está há 3h sem ser visto por João. Considere ligar ou enviar mensagem.',
         url: "/dashboard",
         tag: "DEMAND_UNSEEN_ESCALATION:demand-1",
       },
@@ -478,5 +483,48 @@ describe("dispatchPendingNotifications — escalonamento de não-lidas", () => {
 
     expect(notifyMock).not.toHaveBeenCalled()
     expect(result).toEqual(EMPTY_RESULT)
+  })
+
+  it("conta escalatedFailed quando o notify do escalonamento lança", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([buildNotification()])
+    notifyMock.mockRejectedValueOnce(new Error("falha no escalonamento"))
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(result).toEqual({ ...EMPTY_RESULT, escalatedFailed: 1 })
+  })
+
+  it("nomeia o destinatário que não leu (participante), não o técnico", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([activeDemand()])
+    prismaMock.notification.findMany.mockResolvedValue([
+      buildNotification({ userId: "user-2", user: { name: "Carlos" } }),
+    ])
+
+    await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          body: expect.stringContaining("sem ser visto por Carlos"),
+        }),
+      })
+    )
+  })
+
+  it("consulta notificações uma única vez (sem N+1)", async () => {
+    prismaMock.demand.findMany.mockResolvedValue([
+      activeDemand(),
+      activeDemand({ id: "demand-2" }),
+    ])
+    prismaMock.notification.findMany.mockResolvedValue([
+      buildNotification(),
+      buildNotification({ id: "notification-2", demandId: "demand-2" }),
+    ])
+
+    await dispatchPendingNotifications(NOW)
+
+    expect(prismaMock.notification.findMany).toHaveBeenCalledTimes(1)
+    expect(notifyMock).toHaveBeenCalledTimes(2)
   })
 })

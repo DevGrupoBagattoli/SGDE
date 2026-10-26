@@ -1,5 +1,6 @@
 import { UserSession } from "@/lib/auth"
 import { Demand, DemandStatus } from "@/lib/demands"
+import type { NotificationEventType } from "@/lib/notifications/types"
 import type {
   ReportAuditRow,
   ReportDemandRow,
@@ -309,7 +310,7 @@ export const apiReportOccupation = async (params: URLSearchParams) => {
 
 export type NotificationDto = {
   id: string
-  type: "SERVICE_UPCOMING" | "SERVICE_FINISH_REMINDER"
+  type: NotificationEventType
   priority: "NORMAL" | "CRITICAL"
   title: string
   body: string
