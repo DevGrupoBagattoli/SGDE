@@ -155,7 +155,7 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="user-email">E-mail (para notificações; ainda não implementado)</Label>
+            <Label htmlFor="user-email">E-mail (para notificações; ainda não ativo)</Label>
             <Input
               id="user-email"
               type="email"
