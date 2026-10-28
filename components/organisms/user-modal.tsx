@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { UserDto } from "@/lib/api"
 import {
+  validateUserEmail,
   validateUserName,
   validateUserPassword,
 } from "@/lib/users"
@@ -26,6 +27,7 @@ type UserModalProps = {
     name: string
     role: "gestor" | "eletricista"
     password?: string
+    email?: string
   }) => Promise<void>
 }
 
@@ -35,9 +37,22 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
     user?.role ?? "eletricista"
   )
   const [password, setPassword] = useState("")
+  const [email, setEmail] = useState(user?.email ?? "")
+  const [emailError, setEmailError] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value)
+    if (emailError) {
+      setEmailError(validateUserEmail(value) ?? "")
+    }
+  }
+
+  const handleEmailBlur = () => {
+    setEmailError(validateUserEmail(email) ?? "")
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -58,10 +73,18 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
         throw new Error(passwordError)
       }
 
+      const trimmedEmail = email.trim()
+      const emailValidationError = validateUserEmail(trimmedEmail)
+      if (emailValidationError) {
+        setEmailError(emailValidationError)
+        throw new Error(emailValidationError)
+      }
+
       const payload: {
         name: string
         role: "gestor" | "eletricista"
         password?: string
+        email?: string
       } = {
         name: trimmedName,
         role,
@@ -69,6 +92,13 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
 
       if (password) {
         payload.password = password
+      }
+
+      if (user) {
+        // Na edição, campo vazio envia "" para limpar o e-mail cadastrado.
+        payload.email = trimmedEmail
+      } else if (trimmedEmail) {
+        payload.email = trimmedEmail
       }
 
       await onSave(payload)
@@ -122,6 +152,25 @@ export function UserModal({ user, onClose, onSave }: UserModalProps) {
               onChange={(event) => setName(event.target.value)}
               placeholder="Nome completo"
             />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="user-email">E-mail (para notificações; ainda não ativo)</Label>
+            <Input
+              id="user-email"
+              type="email"
+              value={email}
+              onChange={(event) => handleEmailChange(event.target.value)}
+              onBlur={handleEmailBlur}
+              placeholder="nome@empresa.com.br"
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? "user-email-error" : undefined}
+            />
+            {emailError ? (
+              <p id="user-email-error" className="text-xs font-medium text-red-600">
+                {emailError}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-2">

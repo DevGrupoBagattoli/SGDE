@@ -5,6 +5,7 @@ import {
   hashPassword,
   isForeignKeyConstraintError,
   isUniqueConstraintError,
+  isUniqueConstraintErrorFor,
   toUserDto,
   updateUserSchema,
 } from "@/lib/server/users"
@@ -30,6 +31,7 @@ export async function GET(_: Request, { params }: RouteParams) {
       id: true,
       name: true,
       role: true,
+      email: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -106,11 +108,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         ...(parsed.data.password
           ? { passwordHash: await hashPassword(parsed.data.password) }
           : {}),
+        // E-mail vazio limpa o cadastro (null); ausente mantém o valor atual.
+        ...(parsed.data.email !== undefined
+          ? { email: parsed.data.email ? parsed.data.email : null }
+          : {}),
       },
       select: {
         id: true,
         name: true,
         role: true,
+        email: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -120,6 +127,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       user: toUserDto(user),
     })
   } catch (error) {
+    if (isUniqueConstraintErrorFor(error, "email")) {
+      return jsonError(409, "CONFLICT", "Já existe um usuário com este e-mail", {
+        field: "email",
+        value: parsed.data.email,
+        hint: "Informe um e-mail diferente",
+      })
+    }
+
     if (isUniqueConstraintError(error)) {
       return jsonError(409, "CONFLICT", "Já existe um usuário com este nome", {
         field: "name",
@@ -160,6 +175,7 @@ export async function DELETE(_: Request, { params }: RouteParams) {
       id: true,
       name: true,
       role: true,
+      email: true,
       createdAt: true,
       updatedAt: true,
     },

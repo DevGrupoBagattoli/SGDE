@@ -8,6 +8,8 @@ export type ApiErrorCode =
   | "CONFLICT"
   | "UNPROCESSABLE"
   | "INTERNAL"
+  | "VAPID_NOT_CONFIGURED"
+  | "CRON_NOT_CONFIGURED"
 
 export type ApiWarning = {
   code: string

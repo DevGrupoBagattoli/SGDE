@@ -1,9 +1,15 @@
-import { UserRole } from "@prisma/client"
+import { DemandStatus, UserRole } from "@prisma/client"
 
+import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
-import { toDemandDto, updateStatusSchema, demandStatusToDb } from "@/lib/server/demands"
+import {
+  toDemandDto,
+  updateStatusSchema,
+  demandStatusToDb,
+  demandStatusFromDb,
+} from "@/lib/server/demands"
 import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -98,6 +104,33 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       createdBy: true,
       participants: { include: { user: true } },
     },
+  })
+
+  // Cancelamento automático (§5.4): deliveries ainda PENDING da demanda não devem sair.
+  // Best-effort — o scheduler re-verifica o status antes de enviar (segunda camada);
+  // uma falha aqui não pode quebrar a resposta do update de status.
+  if (nextStatus === DemandStatus.DONE || nextStatus === DemandStatus.CANCELLED) {
+    try {
+      await prisma.notificationDelivery.updateMany({
+        where: {
+          status: "PENDING",
+          notification: { demandId: demand.id },
+        },
+        data: { status: "CANCELLED" },
+      })
+    } catch {
+      // Silencioso de propósito: ver comentário acima.
+    }
+  }
+
+  // ORDEM CRÍTICA: o cancelamento de deliveries PENDING acima precisa vir ANTES
+  // deste hook — senão o delivery da notificação nova também nasceria cancelado.
+  await notifyDemandEvent({
+    type: nextStatus === DemandStatus.CANCELLED ? "DEMAND_CANCELLED" : "DEMAND_STATUS_CHANGED",
+    demand: updated,
+    actorId: auth.user.id,
+    actorName: auth.user.name,
+    statusLabel: demandStatusFromDb(nextStatus),
   })
 
   const dto = toDemandDto(updated)

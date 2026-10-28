@@ -1,5 +1,6 @@
 import { UserRole } from "@prisma/client"
 
+import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
@@ -87,6 +88,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
   const dto = toDemandDto(updated)
 
+  await notifyDemandEvent({
+    type: "DEMAND_DESCRIPTION_CHANGED",
+    demand: updated,
+    actorId: auth.user.id,
+    actorName: auth.user.name,
+  })
+
   return jsonOk({
     demand: {
       ...dto,
@@ -146,6 +154,20 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       },
     },
   })
+
+  const deleted = await prisma.demand.findUnique({
+    where: { id },
+    include: { technician: true, participants: { include: { user: true } } },
+  })
+
+  if (deleted) {
+    await notifyDemandEvent({
+      type: "DEMAND_DELETED",
+      demand: deleted,
+      actorId: auth.user.id,
+      actorName: auth.user.name,
+    })
+  }
 
   return jsonOk({ deleted: true, demandId: id })
 }

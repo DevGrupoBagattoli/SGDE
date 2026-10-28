@@ -1,6 +1,7 @@
 import Image from "next/image"
 import { ClipboardList, Menu } from "lucide-react"
 
+import { NotificationsBell } from "@/components/organisms/notifications-bell"
 import { Button } from "@/components/ui/button"
 import { UserSession, roleLabels } from "@/lib/auth"
 
@@ -35,6 +36,7 @@ export function DashboardHero({ session, onMenuOpen }: DashboardHeroProps) {
             height={40}
             className="h-6 w-auto rounded-md sm:h-7 md:h-8"
           />
+          <NotificationsBell />
           {onMenuOpen ? (
             <Button
               type="button"

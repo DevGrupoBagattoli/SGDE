@@ -1,6 +1,7 @@
 import { UserRole } from "@prisma/client"
 import { z } from "zod"
 
+import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canViewDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysUtc } from "@/lib/server/dates"
@@ -221,6 +222,13 @@ export async function POST(request: Request) {
   })
 
   const dto = toDemandDto(created)
+
+  await notifyDemandEvent({
+    type: "DEMAND_CREATED",
+    demand: created,
+    actorId: auth.user.id,
+    actorName: auth.user.name,
+  })
 
   return jsonOk(
     {
