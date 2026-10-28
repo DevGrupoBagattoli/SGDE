@@ -159,6 +159,8 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
 
   for (const demand of demands) {
     // ANTI-CORRIDA: re-busca a demanda antes de notificar; se virou DONE/CANCELLED/deleted → pula.
+    // A janela de tempo (upcoming/overdue) também é avaliada na linha fresh: um
+    // reagendamento entre o findMany e aqui não pode disparar lembrete com horário antigo.
     const fresh = await prisma.demand.findUnique({ where: { id: demand.id } })
 
     if (
@@ -170,8 +172,8 @@ export const dispatchPendingNotifications = async (now = new Date()) => {
       continue
     }
 
-    const upcoming = isUpcomingCandidate(demand, now, windowMinutes)
-    const overdue = isOverdueCandidate(demand, now, finishMaxHours)
+    const upcoming = isUpcomingCandidate(fresh, now, windowMinutes)
+    const overdue = isOverdueCandidate(fresh, now, finishMaxHours)
 
     for (const recipient of resolveRecipients(demand)) {
       if (upcoming) {

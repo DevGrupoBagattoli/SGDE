@@ -46,6 +46,8 @@ type FreshDemand = {
   id: string
   status: DemandStatus
   deletedAt: Date | null
+  inicioPrevisto: Date
+  fimPrevisto: Date
 }
 
 type SchedulerNotification = {
@@ -96,10 +98,14 @@ const buildDemand = (
   ...overrides,
 })
 
+// Espelha os defaults de buildDemand: fresh = stale, salvo quando o teste
+// simula explicitamente um reagendamento entre o findMany e a re-busca.
 const buildFresh = (overrides: Partial<FreshDemand> = {}): FreshDemand => ({
   id: "demand-1",
   status: DemandStatus.PENDING,
   deletedAt: null,
+  inicioPrevisto: inMinutes(10),
+  fimPrevisto: inMinutes(60),
   ...overrides,
 })
 
@@ -211,6 +217,20 @@ describe("dispatchPendingNotifications — anti-corrida e cancelamento", () => {
     expect(notifyMock).not.toHaveBeenCalled()
     expect(result).toEqual(EMPTY_RESULT)
   })
+
+  it("avalia a janela de tempo na linha fresh: reagendamento não dispara lembrete com horário antigo", async () => {
+    // Linha stale dentro da janela upcoming (início em +10min), mas fresh
+    // reagendada para +2h (fora da janela de 15min) → nenhum SERVICE_UPCOMING.
+    prismaMock.demand.findMany.mockResolvedValue([buildDemand()])
+    prismaMock.demand.findUnique.mockResolvedValue(
+      buildFresh({ inicioPrevisto: inHours(2), fimPrevisto: inHours(3) })
+    )
+
+    const result = await dispatchPendingNotifications(NOW)
+
+    expect(notifyMock).not.toHaveBeenCalled()
+    expect(result).toEqual(EMPTY_RESULT)
+  })
 })
 
 describe("dispatchPendingNotifications — envio", () => {
@@ -243,6 +263,9 @@ describe("dispatchPendingNotifications — envio", () => {
         fimPrevisto: inMinutes(-5),
       }),
     ])
+    prismaMock.demand.findUnique.mockResolvedValue(
+      buildFresh({ inicioPrevisto: inMinutes(-30), fimPrevisto: inMinutes(-5) })
+    )
 
     const result = await dispatchPendingNotifications(NOW)
 
@@ -321,6 +344,13 @@ describe("dispatchPendingNotifications — envio", () => {
 })
 
 describe("dispatchPendingNotifications — lembrete recorrente", () => {
+  // fresh espelha a demanda vencida usada nos cenários deste bloco.
+  beforeEach(() => {
+    prismaMock.demand.findUnique.mockResolvedValue(
+      buildFresh({ inicioPrevisto: inMinutes(-30), fimPrevisto: inMinutes(-5) })
+    )
+  })
+
   it("usa o bucket de hora no dedupeKey do lembrete de finalização", async () => {
     prismaMock.demand.findMany.mockResolvedValue([
       buildDemand({
@@ -379,6 +409,9 @@ describe("dispatchPendingNotifications — lembrete recorrente", () => {
     prismaMock.demand.findMany.mockResolvedValue([
       buildDemand({ inicioPrevisto: inHours(-31), fimPrevisto: inHours(-30) }),
     ])
+    prismaMock.demand.findUnique.mockResolvedValue(
+      buildFresh({ inicioPrevisto: inHours(-31), fimPrevisto: inHours(-30) })
+    )
 
     const result = await dispatchPendingNotifications(NOW)
 
@@ -396,6 +429,14 @@ describe("dispatchPendingNotifications — escalonamento de não-lidas", () => {
       fimPrevisto: inMinutes(120),
       ...overrides,
     })
+
+  // Demanda ativa fora de qualquer janela: o loop principal não notifica e o
+  // teste isola o escalonamento.
+  beforeEach(() => {
+    prismaMock.demand.findUnique.mockResolvedValue(
+      buildFresh({ inicioPrevisto: inMinutes(60), fimPrevisto: inMinutes(120) })
+    )
+  })
 
   it("escalona para o criador quando a notificação está não lida há ≥ 2h", async () => {
     prismaMock.demand.findMany.mockResolvedValue([activeDemand()])

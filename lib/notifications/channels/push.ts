@@ -7,6 +7,10 @@ import type {
 } from "@/lib/notifications/types"
 import { prisma } from "@/lib/server/prisma"
 
+// Timeout do socket: o canal é awaited no caminho da requisição (mutações de
+// demanda); um hang no push service não pode travar a resposta HTTP.
+const PUSH_TIMEOUT_MS = 10_000
+
 // Configuração VAPID lazy: `setVapidDetails` valida as chaves e lança erro se
 // estiverem ausentes — chamá-la no top-level quebraria a importação do módulo
 // em testes/ambientes sem env. Configura uma única vez por processo.
@@ -71,7 +75,8 @@ export const pushChannel: NotificationChannel = {
             endpoint: subscription.endpoint,
             keys: { p256dh: subscription.p256dh, auth: subscription.auth },
           },
-          payload
+          payload,
+          { timeout: PUSH_TIMEOUT_MS }
         )
       )
     )

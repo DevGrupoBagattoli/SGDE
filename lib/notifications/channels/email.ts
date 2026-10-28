@@ -7,6 +7,10 @@ import { prisma } from "@/lib/server/prisma"
 
 const BREVO_EMAIL_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 
+// Timeout do fetch: o canal é awaited no caminho da requisição (mutações de
+// demanda); sem signal, um hang da Brevo (undici ~5min) travaria a resposta HTTP.
+const BREVO_TIMEOUT_MS = 10_000
+
 export const emailChannel: NotificationChannel = {
   channel: "EMAIL",
   async send({ userId, content }: ChannelSendInput): Promise<ChannelSendResult> {
@@ -47,6 +51,7 @@ export const emailChannel: NotificationChannel = {
           subject: content.title,
           textContent: content.body,
         }),
+        signal: AbortSignal.timeout(BREVO_TIMEOUT_MS),
       })
 
       if (!response.ok) {

@@ -114,6 +114,13 @@ export const notify = async (input: NotificationInput): Promise<NotifyResult> =>
     // Canais tratam suas próprias falhas e retornam { ok: false }; este
     // try/catch cobre exceções inesperadas (ex.: erro de banco dentro do
     // canal) para que o delivery não fique preso em PENDING.
+    //
+    // GUARDA: o veredito é gravado com updateMany condicionado a status PENDING.
+    // Se a rota de status marcou a demanda DONE/CANCELLED durante o envio
+    // (auto-cancel vira o delivery para CANCELLED), o update não casa nenhuma
+    // linha e o CANCELLED sobrevive — evita push de demanda cancelada. O
+    // updateMany não lança quando count = 0, que é justamente o comportamento
+    // desejado.
     let result: ChannelSendResult
 
     try {
@@ -133,8 +140,8 @@ export const notify = async (input: NotificationInput): Promise<NotifyResult> =>
       }
     }
 
-    await prisma.notificationDelivery.update({
-      where: { id: delivery.id },
+    await prisma.notificationDelivery.updateMany({
+      where: { id: delivery.id, status: "PENDING" },
       data: {
         status: result.ok ? "SENT" : "FAILED",
         attempts: { increment: 1 },

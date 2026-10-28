@@ -17,7 +17,7 @@ jest.mock("@/lib/server/prisma", () => ({
     },
     notificationDelivery: {
       create: jest.fn(),
-      update: jest.fn(),
+      updateMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -55,7 +55,7 @@ type PrismaMock = {
   }
   notificationDelivery: {
     create: AsyncMock<{ id: string }>
-    update: AsyncMock<{ id: string }>
+    updateMany: AsyncMock<{ count: number }>
   }
   user: {
     findUnique: AsyncMock<UserLookup | null>
@@ -86,7 +86,7 @@ beforeEach(() => {
   prismaMock.notification.findUnique.mockResolvedValue(null)
   prismaMock.notification.create.mockResolvedValue({ id: "notification-1" })
   prismaMock.notificationDelivery.create.mockResolvedValue({ id: "delivery-1" })
-  prismaMock.notificationDelivery.update.mockResolvedValue({ id: "delivery-1" })
+  prismaMock.notificationDelivery.updateMany.mockResolvedValue({ count: 1 })
   prismaMock.user.findUnique.mockResolvedValue({
     email: null,
     pushSubscriptions: [],
@@ -279,8 +279,8 @@ describe("notify — decisão de canais e deliveries", () => {
       demandId: "demand-1",
       priority: "NORMAL",
     })
-    expect(prismaMock.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: "delivery-1" },
+    expect(prismaMock.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: { id: "delivery-1", status: "PENDING" },
       data: {
         status: "SENT",
         attempts: { increment: 1 },
@@ -362,8 +362,8 @@ describe("notify — decisão de canais e deliveries", () => {
       },
       select: { id: true },
     })
-    expect(prismaMock.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: "delivery-1" },
+    expect(prismaMock.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: { id: "delivery-1", status: "PENDING" },
       data: {
         status: "FAILED",
         attempts: { increment: 1 },
@@ -387,8 +387,8 @@ describe("notify — decisão de canais e deliveries", () => {
       notificationId: "notification-1",
       channels: ["PUSH"],
     })
-    expect(prismaMock.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: "delivery-1" },
+    expect(prismaMock.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: { id: "delivery-1", status: "PENDING" },
       data: {
         status: "FAILED",
         attempts: { increment: 1 },
@@ -413,6 +413,6 @@ describe("notify — decisão de canais e deliveries", () => {
     })
     expect(prismaMock.notification.create).toHaveBeenCalledTimes(1)
     expect(prismaMock.notificationDelivery.create).not.toHaveBeenCalled()
-    expect(prismaMock.notificationDelivery.update).not.toHaveBeenCalled()
+    expect(prismaMock.notificationDelivery.updateMany).not.toHaveBeenCalled()
   })
 })
