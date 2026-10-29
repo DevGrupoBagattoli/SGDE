@@ -14,6 +14,7 @@ import {
 } from "@/lib/calendar"
 import {
   Demand,
+  DemandStatus,
   matchesTechnicianDashboardFilter,
   type DashboardTechnicianFilterRole,
 } from "@/lib/demands"
@@ -137,6 +138,8 @@ type DemandCalendarProps = {
   onSelectDemand: (demand: Demand) => void
   isManager?: boolean
   onDeleteDemand?: (demand: Demand) => void
+  canEditStatus?: (demand: Demand) => boolean
+  onUpdateStatus?: (id: string, status: DemandStatus) => Promise<void> | void
   showCreateButton?: boolean
   onCreateDemand?: () => void
 }
@@ -156,6 +159,8 @@ export function DemandCalendar({
   onSelectDemand,
   isManager,
   onDeleteDemand,
+  canEditStatus,
+  onUpdateStatus,
   showCreateButton = false,
   onCreateDemand,
 }: DemandCalendarProps) {
@@ -388,10 +393,12 @@ export function DemandCalendar({
                   {agendaDemands.map((demand) => (
                     <DemandTimeSlot
                       key={demand.id}
+                      canEditStatus={canEditStatus?.(demand)}
                       demand={demand}
                       isManager={isManager}
                       onDeleteDemand={onDeleteDemand}
                       onSelect={onSelectDemand}
+                      onUpdateStatus={onUpdateStatus}
                     />
                   ))}
                 </div>

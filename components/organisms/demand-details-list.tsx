@@ -4,6 +4,7 @@ import { DemandCard } from "@/components/molecules/demand-card"
 import { Demand, DemandStatus } from "@/lib/demands"
 
 type DemandDetailsListProps = {
+  canEditStatus: (demand: Demand) => boolean
   demands: Demand[]
   isManager?: boolean
   onDeleteDemand?: (demand: Demand) => void
@@ -12,6 +13,7 @@ type DemandDetailsListProps = {
 }
 
 export function DemandDetailsList({
+  canEditStatus,
   demands,
   isManager,
   onDeleteDemand,
@@ -35,6 +37,7 @@ export function DemandDetailsList({
         <div className="mt-5 grid gap-3">
           {demands.map((demand) => (
             <DemandCard
+              canEditStatus={canEditStatus(demand)}
               demand={demand}
               isManager={isManager}
               key={demand.id}

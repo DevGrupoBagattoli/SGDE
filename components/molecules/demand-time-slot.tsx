@@ -1,6 +1,6 @@
 "use client"
 
-import { MapPin, MoreVertical, Pencil, Trash2, UserRound } from "lucide-react"
+import { CheckCircle2, MapPin, MoreVertical, Pencil, Trash2, UserRound } from "lucide-react"
 
 import { StatusBadge } from "@/components/atoms/status-badge"
 import { DemandScheduleTrack } from "@/components/molecules/demand-schedule-track"
@@ -11,14 +11,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Demand } from "@/lib/demands"
+import { Demand, DemandStatus } from "@/lib/demands"
 import { cn } from "@/lib/utils"
 
 type DemandTimeSlotProps = {
+  canEditStatus?: boolean
   demand: Demand
   isManager?: boolean
   onDeleteDemand?: (demand: Demand) => void
   onSelect: (demand: Demand) => void
+  onUpdateStatus?: (id: string, status: DemandStatus) => Promise<void> | void
 }
 
 function MetaRow({
@@ -41,12 +43,19 @@ function MetaRow({
 }
 
 export function DemandTimeSlot({
+  canEditStatus = false,
   demand,
   isManager,
   onDeleteDemand,
   onSelect,
+  onUpdateStatus,
 }: DemandTimeSlotProps) {
   const canDelete = isManager && onDeleteDemand
+  const canComplete =
+    canEditStatus &&
+    onUpdateStatus &&
+    demand.status !== "Concluído" &&
+    demand.status !== "Cancelado"
   return (
     <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <DropdownMenu>
@@ -114,6 +123,17 @@ export function DemandTimeSlot({
           </li>
         ) : null}
       </ul>
+
+      {canComplete ? (
+        <Button
+          className="mt-4 h-10 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+          type="button"
+          onClick={() => onUpdateStatus(demand.id, "Concluído")}
+        >
+          <CheckCircle2 className="size-4" />
+          Concluir demanda
+        </Button>
+      ) : null}
     </article>
   )
 }
