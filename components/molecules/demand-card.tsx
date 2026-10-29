@@ -13,6 +13,7 @@ import {
 } from "@/lib/demands"
 
 type DemandCardProps = {
+  canEditStatus?: boolean
   demand: Demand
   isManager?: boolean
   onDeleteDemand?: (demand: Demand) => void
@@ -21,6 +22,7 @@ type DemandCardProps = {
 }
 
 export function DemandCard({
+  canEditStatus = false,
   demand,
   isManager,
   onDeleteDemand,
@@ -99,20 +101,22 @@ export function DemandCard({
               >
                 Editar horário
               </Button>
-              <select
-                aria-label={`Alterar status de ${demand.descricao}`}
-                className="h-8 min-w-0 flex-1 rounded-4xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
-                value={demand.status}
-                onChange={(event) =>
-                  onUpdateStatus(demand.id, event.target.value as DemandStatus)
-                }
-              >
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              {canEditStatus ? (
+                <select
+                  aria-label={`Alterar status de ${demand.descricao}`}
+                  className="h-8 min-w-0 flex-1 rounded-4xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  value={demand.status}
+                  onChange={(event) =>
+                    onUpdateStatus(demand.id, event.target.value as DemandStatus)
+                  }
+                >
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
             </div>
             {isManager && onDeleteDemand ? (
               <Button

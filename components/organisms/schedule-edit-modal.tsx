@@ -6,12 +6,16 @@ import { UserPlus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Demand,
+  DemandStatus,
   formatDuracaoFromParts,
   parseDuracaoParts,
+  statusOptions,
 } from "@/lib/demands"
 
 type ScheduleEditModalProps = {
   allTechnicians: string[]
+  /** Gestor ou técnico responsável; participantes não alteram status (API responde 403). */
+  canEditStatus?: boolean
   demand: Demand
   descricaoValue?: string
   error: string
@@ -25,7 +29,8 @@ type ScheduleEditModalProps = {
   onSubmit: (
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
-    duracaoPrevista: string
+    duracaoPrevista: string,
+    status: DemandStatus
   ) => Promise<void> | void
 }
 
@@ -44,6 +49,7 @@ export function ScheduleEditModal(props: ScheduleEditModalProps) {
 
 function ScheduleEditModalForm({
   allTechnicians,
+  canEditStatus = false,
   demand,
   descricaoValue,
   error,
@@ -63,6 +69,7 @@ function ScheduleEditModalForm({
   const [durHours, setDurHours] = useState(initialDur.hours)
   const [durMinutes, setDurMinutes] = useState(initialDur.minutes)
   const [selectedToAdd, setSelectedToAdd] = useState("")
+  const [statusValue, setStatusValue] = useState<DemandStatus>(demand.status)
 
   const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
 
@@ -90,7 +97,7 @@ function ScheduleEditModalForm({
       <form
         className="max-h-[90svh] w-full max-w-lg overflow-x-hidden overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
         onSubmit={(e) =>
-          onSubmit(e, participantes, duracaoPreview)
+          onSubmit(e, participantes, duracaoPreview, statusValue)
         }
       >
         <div className="flex items-start justify-between gap-4">
@@ -124,6 +131,23 @@ function ScheduleEditModalForm({
               onChange={(event) => onDescricaoChange(event.target.value)}
             />
           </div>
+        ) : null}
+
+        {canEditStatus ? (
+          <label className="mt-6 grid gap-2 text-sm font-medium text-slate-700">
+            Status
+            <select
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              value={statusValue}
+              onChange={(event) => setStatusValue(event.target.value as DemandStatus)}
+            >
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         <div className="mt-6 grid gap-4">

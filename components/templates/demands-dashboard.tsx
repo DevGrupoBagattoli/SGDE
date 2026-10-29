@@ -325,6 +325,10 @@ export function DemandsDashboard() {
     setScheduleError("")
   }
 
+  // Espelha a regra da API (PATCH /status): gestor ou técnico responsável; participante recebe 403.
+  const canEditStatus = (demand: Demand) =>
+    session?.role === "gestor" || demand.tecnico === session?.name
+
   const handleUpdateDescricao = async (
     id: string,
     descricao: string,
@@ -389,7 +393,8 @@ export function DemandsDashboard() {
   const handleUpdateSchedule = async (
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
-    duracaoPrevista: string
+    duracaoPrevista: string,
+    nextStatus: DemandStatus
   ) => {
     event.preventDefault()
 
@@ -422,6 +427,8 @@ export function DemandsDashboard() {
       duracaoChanged ||
       observacoesChanged ||
       participantesChanged
+    const statusChanged =
+      canEditStatus(editingDemand) && nextStatus !== editingDemand.status
 
     if (descricaoChanged) {
       const descricaoError = validateDemandDescricao(trimmedDescricao)
@@ -438,7 +445,7 @@ export function DemandsDashboard() {
       return
     }
 
-    if (!descricaoChanged && !scheduleFieldsChanged) {
+    if (!descricaoChanged && !scheduleFieldsChanged && !statusChanged) {
       setEditingDemand(null)
       return
     }
@@ -448,6 +455,7 @@ export function DemandsDashboard() {
     setRequestWarning("")
 
     let descricaoSaved = false
+    let scheduleSaved = false
 
     try {
       let currentDemand = editingDemand
@@ -473,6 +481,29 @@ export function DemandsDashboard() {
         })
 
         const updatedDemand = response.data.demand
+        currentDemand = updatedDemand
+        scheduleSaved = true
+
+        setDemands((currentDemands) =>
+          currentDemands.map((demand) =>
+            demand.id === editingDemand.id ? updatedDemand : demand
+          )
+        )
+
+        if (response.warnings.length > 0) {
+          setRequestWarning(response.warnings[0].message)
+        }
+      }
+
+      // Status por último: concluir/cancelar cancela os pushes pendentes da demanda,
+      // inclusive os gerados pela alteração de agenda logo acima.
+      if (statusChanged) {
+        const response = await apiUpdateStatus(
+          currentDemand.id,
+          nextStatus,
+          currentDemand.version
+        )
+        const updatedDemand = response.data.demand
 
         setDemands((currentDemands) =>
           currentDemands.map((demand) =>
@@ -489,9 +520,13 @@ export function DemandsDashboard() {
     } catch (error) {
       const baseMessage =
         error instanceof Error ? error.message : "Falha ao atualizar demanda"
+      const savedParts = [
+        descricaoSaved ? "descrição" : null,
+        scheduleSaved ? "agenda" : null,
+      ].filter(Boolean)
       setScheduleError(
-        descricaoSaved
-          ? `${baseMessage} A descrição já foi salva; confira o horário e tente novamente.`
+        savedParts.length > 0
+          ? `${baseMessage} Já salvo: ${savedParts.join(" e ")}; confira os dados e tente novamente.`
           : baseMessage
       )
 
@@ -648,6 +683,7 @@ export function DemandsDashboard() {
               onSelectDemand={handleOpenScheduleEditor}
             />
             <DemandDetailsList
+              canEditStatus={canEditStatus}
               demands={filteredDemands}
               isManager={isManager}
               onDeleteDemand={handleRequestDelete}
@@ -663,6 +699,7 @@ export function DemandsDashboard() {
       {editingDemand ? (
         <ScheduleEditModal
           allTechnicians={technicianOptions}
+          canEditStatus={canEditStatus(editingDemand)}
           demand={editingDemand}
           descricaoValue={descricaoValue}
           error={scheduleError}

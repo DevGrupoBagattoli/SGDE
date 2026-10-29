@@ -271,7 +271,7 @@ export function NotificationsBell() {
             Nenhuma notificação
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex max-h-[min(24rem,50svh)] flex-col overflow-y-auto overscroll-contain">
             {notifications.map((notification) => (
               <div
                 key={notification.id}
