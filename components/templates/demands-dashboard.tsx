@@ -646,6 +646,8 @@ export function DemandsDashboard() {
                 onDeleteDemand={handleRequestDelete}
                 onSelectDate={setSelectedDate}
                 onSelectDemand={handleOpenScheduleEditor}
+                canEditStatus={canEditStatus}
+                onUpdateStatus={handleUpdateStatus}
               />
           </div>
 
@@ -676,8 +678,10 @@ export function DemandsDashboard() {
               onSelectDemand={handleOpenScheduleEditor}
             />
             <DaySchedulePanel
+              canEditStatus={canEditStatus}
               demands={selectedDayDemands}
               isManager={isManager}
+              onUpdateStatus={handleUpdateStatus}
               selectedDate={selectedDate}
               onDeleteDemand={handleRequestDelete}
               onSelectDemand={handleOpenScheduleEditor}

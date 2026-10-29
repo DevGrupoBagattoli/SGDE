@@ -4,22 +4,26 @@ import { CalendarClock } from "lucide-react"
 
 import { DemandTimeSlot } from "@/components/molecules/demand-time-slot"
 import { longDateFormatter } from "@/lib/calendar"
-import { Demand } from "@/lib/demands"
+import { Demand, DemandStatus } from "@/lib/demands"
 
 type DaySchedulePanelProps = {
   demands: Demand[]
   selectedDate: Date
   isManager?: boolean
+  canEditStatus?: (demand: Demand) => boolean
   onDeleteDemand?: (demand: Demand) => void
   onSelectDemand: (demand: Demand) => void
+  onUpdateStatus?: (id: string, status: DemandStatus) => Promise<void> | void
 }
 
 export function DaySchedulePanel({
   demands,
   selectedDate,
   isManager,
+  canEditStatus,
   onDeleteDemand,
   onSelectDemand,
+  onUpdateStatus,
 }: DaySchedulePanelProps) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -40,11 +44,13 @@ export function DaySchedulePanel({
         {demands.length > 0 ? (
           demands.map((demand) => (
             <DemandTimeSlot
+              canEditStatus={canEditStatus?.(demand)}
               demand={demand}
               isManager={isManager}
               key={demand.id}
               onDeleteDemand={onDeleteDemand}
               onSelect={onSelectDemand}
+              onUpdateStatus={onUpdateStatus}
             />
           ))
         ) : (

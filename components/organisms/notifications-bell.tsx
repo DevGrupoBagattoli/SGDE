@@ -246,9 +246,10 @@ export function NotificationsBell() {
 
       <PopoverContent
         align="end"
-        className="w-80 min-w-80 p-1.5 sm:w-96 sm:min-w-96"
+        collisionPadding={8}
+        className="flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-[min(20rem,calc(100vw-1rem))] flex-col p-1.5 sm:w-96"
       >
-        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2.5">
           <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
             Notificações
           </span>
@@ -259,19 +260,20 @@ export function NotificationsBell() {
           ) : null}
         </div>
 
-        <div className="-mx-1.5 my-1.5 h-px bg-border/50" />
+        <div className="-mx-1.5 my-1.5 h-px shrink-0 bg-border/50" />
 
         {isLoading && notifications.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-slate-500">
+          <div className="flex shrink-0 items-center justify-center gap-2 px-3 py-6 text-sm text-slate-500">
             <Loader2 className="size-4 animate-spin" />
             Carregando notificações…
           </div>
         ) : notifications.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm text-slate-500">
+          <div className="shrink-0 px-3 py-6 text-center text-sm text-slate-500">
             Nenhuma notificação
           </div>
         ) : (
-          <div className="flex max-h-[min(24rem,50svh)] flex-col overflow-y-auto overscroll-contain">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+            {/* Só a lista rola: cabeçalho, "marcar todas" e ativação de push ficam sempre visíveis. */}
             {notifications.map((notification) => (
               <div
                 key={notification.id}
@@ -333,17 +335,17 @@ export function NotificationsBell() {
         )}
 
         {actionError ? (
-          <p className="px-3 py-2 text-xs font-medium text-red-600">
+          <p className="shrink-0 px-3 py-2 text-xs font-medium text-red-600">
             {actionError}
           </p>
         ) : null}
 
-        <div className="-mx-1.5 my-1.5 h-px bg-border/50" />
+        <div className="-mx-1.5 my-1.5 h-px shrink-0 bg-border/50" />
 
         <button
           type="button"
           disabled={unreadCount === 0 || isLoading}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50"
+          className="flex w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-foreground/10 disabled:pointer-events-none disabled:opacity-50"
           onClick={() => void handleReadAll()}
         >
           <CheckCheck className="size-4" />
@@ -352,11 +354,11 @@ export function NotificationsBell() {
 
         {showActivationSection ? (
           <>
-            <div className="-mx-1.5 my-1.5 h-px bg-border/50" />
-            <div className="px-3 py-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <div className="-mx-1.5 my-1.5 h-px shrink-0 bg-border/50" />
+            <div className="shrink-0 px-3 py-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
               Notificações push neste dispositivo
             </div>
-            <div className="px-3 pb-3">
+            <div className="shrink-0 px-3 pb-3">
               {pushState === "subscribed" ? (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-emerald-700">
