@@ -1,3 +1,13 @@
+import {
+  APP_TIME_ZONE,
+  appTimeFormatter,
+  calendarDateOfInstantInAppTz,
+  enumerateDateKeysInAppTz,
+  fromAppDateTimeInputValue,
+  toAppDateTimeInputValue,
+  todayCalendarDateInAppTz,
+} from "@/lib/timezone"
+
 export const weekdayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 
 export const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -5,12 +15,23 @@ export const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
   year: "numeric",
 })
 
+/*
+ * Dois tipos de Date circulam na tela:
+ * - instantes (horarioInicio/horarioFim vindos da API): sempre formatados e
+ *   convertidos no fuso da empresa (lib/timezone), não no fuso do celular;
+ * - datas de calendário (mês exibido, dia selecionado, células do calendário):
+ *   meia-noite local, lidas só por getFullYear/getMonth/getDate.
+ */
+
+/** Formata o dia de um INSTANTE no fuso da empresa (ex.: "qua., 04/11"). */
 export const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   weekday: "short",
   day: "2-digit",
   month: "2-digit",
+  timeZone: APP_TIME_ZONE,
 })
 
+/** Formata uma DATA DE CALENDÁRIO (meia-noite local). */
 export const longDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   weekday: "long",
   day: "2-digit",
@@ -18,25 +39,16 @@ export const longDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   year: "numeric",
 })
 
-export const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
-  hour: "2-digit",
-  minute: "2-digit",
-})
+/** Formata o horário de um INSTANTE no fuso da empresa. */
+export const timeFormatter = appTimeFormatter
 
-/** Valor para `input[type=datetime-local]`: componentes de data/hora no fuso local do instante ISO. */
-export const toDateTimeLocalValue = (isoDate: string) => {
-  const d = new Date(isoDate)
-  if (Number.isNaN(d.getTime())) {
-    return ""
-  }
-  const y = d.getFullYear()
-  const mo = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  const h = String(d.getHours()).padStart(2, "0")
-  const min = String(d.getMinutes()).padStart(2, "0")
-  return `${y}-${mo}-${day}T${h}:${min}`
-}
+/** Valor para `input[type=datetime-local]`: data/hora do instante no fuso da empresa. */
+export const toDateTimeLocalValue = toAppDateTimeInputValue
 
+/** Converte o valor de `input[type=datetime-local]` (fuso da empresa) para ISO UTC. */
+export const fromDateTimeLocalValue = fromAppDateTimeInputValue
+
+/** Chave "YYYY-MM-DD" de uma DATA DE CALENDÁRIO. */
 export const getDateKey = (date: Date) =>
   [
     date.getFullYear(),
@@ -44,26 +56,14 @@ export const getDateKey = (date: Date) =>
     String(date.getDate()).padStart(2, "0"),
   ].join("-")
 
-const startOfLocalDay = (instant: Date) =>
-  new Date(instant.getFullYear(), instant.getMonth(), instant.getDate())
+/** Dias civis (fuso da empresa) entre dois INSTANTES, inclusive. */
+export const enumerateDateKeys = enumerateDateKeysInAppTz
 
-/** Dias civis locais entre início e fim (inclusive), alinhado ao calendário da UI. */
-export const enumerateDateKeysLocal = (start: Date, end: Date) => {
-  const keys: string[] = []
-  const current = startOfLocalDay(start)
-  const last = startOfLocalDay(end)
+/** "Hoje" no fuso da empresa, como data de calendário. */
+export const todayCalendarDate = () => todayCalendarDateInAppTz()
 
-  if (current.getTime() > last.getTime()) {
-    return [getDateKey(startOfLocalDay(start))]
-  }
-
-  while (current.getTime() <= last.getTime()) {
-    keys.push(getDateKey(current))
-    current.setDate(current.getDate() + 1)
-  }
-
-  return keys
-}
+/** Data de calendário do dia de um INSTANTE no fuso da empresa. */
+export const calendarDateOfInstant = calendarDateOfInstantInAppTz
 
 export const buildCalendarDays = (month: Date) => {
   const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1)

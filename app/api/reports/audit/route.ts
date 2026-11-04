@@ -8,6 +8,7 @@ import {
 } from "@/lib/audit-labels"
 import { requireManager, roleFromDb } from "@/lib/server/auth"
 import { buildCsv } from "@/lib/server/csv"
+import { formatAppDateTime } from "@/lib/timezone"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
     const csv = buildCsv(
       headers,
       rows.map((r) => [
-        r.createdAt,
+        formatAppDateTime(new Date(r.createdAt)),
         r.demandId,
         r.tecnico,
         r.ator,

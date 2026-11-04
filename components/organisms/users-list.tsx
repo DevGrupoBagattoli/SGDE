@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { UserDto } from "@/lib/api"
+import { appDateFormatter } from "@/lib/timezone"
 
 type UsersListProps = {
   users: UserDto[]
@@ -70,7 +71,7 @@ export function UsersList({ users, currentUserId, onEdit, onDelete }: UsersListP
                 </span>
               </TableCell>
               <TableCell className="hidden text-slate-500 sm:table-cell">
-                {new Date(user.createdAt).toLocaleDateString("pt-BR")}
+                {appDateFormatter.format(new Date(user.createdAt))}
               </TableCell>
               <TableCell className="text-right">
                 <DropdownMenu>

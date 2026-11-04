@@ -12,14 +12,9 @@ import {
 } from "@/components/ui/table"
 import { formatAuditRole } from "@/lib/audit-labels"
 import { type PaginatedSlice, type ReportAuditRow } from "@/lib/reports"
+import { appDateTimeFormatter } from "@/lib/timezone"
 
-const auditDateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-})
+const auditDateFormatter = appDateTimeFormatter
 
 type ReportAuditSectionProps = {
   loaded: boolean

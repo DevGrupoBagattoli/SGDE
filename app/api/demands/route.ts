@@ -4,7 +4,7 @@ import { z } from "zod"
 import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canViewDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
-import { enumerateDateKeysUtc } from "@/lib/server/dates"
+import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import {
   createDemandSchema,
   demandsWhereForUser,
@@ -114,7 +114,7 @@ export async function GET(request: Request) {
       const dto = toDemandDto(demand)
       return {
         ...dto,
-        dateKeys: enumerateDateKeysUtc(demand.inicioPrevisto, demand.fimPrevisto),
+        dateKeys: enumerateDateKeysInAppTz(demand.inicioPrevisto, demand.fimPrevisto),
       }
     })
 
@@ -234,7 +234,7 @@ export async function POST(request: Request) {
     {
       demand: {
         ...dto,
-        dateKeys: enumerateDateKeysUtc(created.inicioPrevisto, created.fimPrevisto),
+        dateKeys: enumerateDateKeysInAppTz(created.inicioPrevisto, created.fimPrevisto),
       },
     },
     []

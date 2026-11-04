@@ -23,6 +23,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from "@/lib/push"
+import { appDateFormatter } from "@/lib/timezone"
 import { cn } from "@/lib/utils"
 
 /**
@@ -52,7 +53,7 @@ const formatRelativeTime = (isoDate: string): string => {
   if (days === 1) return "há 1 dia"
   if (days < 30) return `há ${days} dias`
 
-  return new Date(isoDate).toLocaleDateString("pt-BR")
+  return appDateFormatter.format(new Date(isoDate))
 }
 
 export function NotificationsBell() {

@@ -2,7 +2,7 @@ import { z } from "zod"
 
 import { requireManager } from "@/lib/server/auth"
 import { buildCsv } from "@/lib/server/csv"
-import { enumerateDateKeysUtc } from "@/lib/server/dates"
+import { enumerateDateKeysInAppTz, formatAppDateTime } from "@/lib/timezone"
 import { demandStatusFromDb, demandStatusToDb } from "@/lib/server/demands"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     duracaoPrevista: `${String(Math.floor(d.duracaoMinutos / 60)).padStart(2, "0")}:${String(d.duracaoMinutos % 60).padStart(2, "0")}h`,
     solicitante: d.createdBy.name,
     participantes: d.participants.map((p) => p.user.name).join(", "),
-    dateKeys: enumerateDateKeysUtc(d.inicioPrevisto, d.fimPrevisto),
+    dateKeys: enumerateDateKeysInAppTz(d.inicioPrevisto, d.fimPrevisto),
   }))
 
   if (queryParsed.data.export === "csv") {
@@ -116,8 +116,8 @@ export async function GET(request: Request) {
         r.local,
         r.descricao,
         r.status,
-        r.horarioInicio,
-        r.horarioFim,
+        formatAppDateTime(new Date(r.horarioInicio)),
+        formatAppDateTime(new Date(r.horarioFim)),
         r.duracaoPrevista,
         r.solicitante,
         r.participantes,

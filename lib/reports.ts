@@ -1,4 +1,5 @@
 import { DemandStatus, statusLabels } from "@/lib/demands"
+import { dateKeyInAppTz, endOfDayInAppTz, startOfDayInAppTz } from "@/lib/timezone"
 
 export type ReportTab = "demands" | "productivity" | "audit" | "occupation"
 
@@ -83,22 +84,18 @@ export const auditActionOptions: Array<{ value: ReportAuditAction; label: string
   { value: "delete", label: "Exclusão" },
 ]
 
-export const toIsoStartOfDay = (dateInput: string) => {
-  const [y, m, d] = dateInput.split("-").map(Number)
-  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString()
-}
+/** Início do dia "YYYY-MM-DD" no fuso da empresa, em ISO UTC. */
+export const toIsoStartOfDay = (dateInput: string) =>
+  startOfDayInAppTz(dateInput).toISOString()
 
-export const toIsoEndOfDay = (dateInput: string) => {
-  const [y, m, d] = dateInput.split("-").map(Number)
-  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
-}
+/** Fim do dia "YYYY-MM-DD" no fuso da empresa, em ISO UTC. */
+export const toIsoEndOfDay = (dateInput: string) =>
+  endOfDayInAppTz(dateInput).toISOString()
 
-export const defaultReportDateInputs = (): ReportDateRange => {
-  const end = new Date()
-  const start = new Date(end.getFullYear(), end.getMonth(), 1)
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-  return { inicio: fmt(start), fim: fmt(end) }
+/** Do dia 1 do mês corrente até hoje, no fuso da empresa. */
+export const defaultReportDateInputs = (now = new Date()): ReportDateRange => {
+  const today = dateKeyInAppTz(now)
+  return { inicio: `${today.slice(0, 8)}01`, fim: today }
 }
 
 export const appendDateRangeParams = (

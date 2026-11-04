@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { UserSession } from "@/lib/auth"
+import { fromDateTimeLocalValue } from "@/lib/calendar"
 import {
   Demand,
   DemandStatus,
@@ -64,7 +65,7 @@ export function CreateDemandModal({
       equipe: "Sem equipe",
       local: local.trim(),
       descricao: descricao.trim(),
-      horarioInicio: new Date(horarioInicio).toISOString(),
+      horarioInicio: fromDateTimeLocalValue(horarioInicio),
       duracaoPrevista: duracaoPreview,
       status,
       observacoes: observacoes.trim(),

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import {
   getDateKey,
   longDateFormatter,
+  todayCalendarDate,
   monthFormatter,
   weekdayLabels,
 } from "@/lib/calendar"
@@ -164,14 +165,14 @@ export function DemandCalendar({
   showCreateButton = false,
   onCreateDemand,
 }: DemandCalendarProps) {
-  const todayKey = getDateKey(new Date())
+  const todayKey = getDateKey(todayCalendarDate())
   const dayStripRef = useRef<HTMLDivElement>(null)
   const [mobileMonthView, setMobileMonthView] = useState(false)
 
   const agendaViewDate = useMemo(() => {
     const parts = selectedDateKey.split("-").map(Number)
     if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
-      return new Date()
+      return todayCalendarDate()
     }
     const [y, m, d] = parts
     return new Date(y, m - 1, d)

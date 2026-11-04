@@ -2,13 +2,13 @@ import { describe, expect, it } from "@jest/globals"
 
 import { buildNotificationContent } from "@/lib/notifications/content"
 
-// 2026-10-24T11:00:00Z equivale a 08:00 em America/Sao_Paulo (UTC-3),
+// 2026-10-24T12:00:00Z equivale a 08:00 em America/Porto_Velho (UTC-4),
 // fuso fixo usado pelo formatador de horário do módulo.
 const DEMAND = {
   id: "demand-1",
   descricao: "Manutenção preventiva",
   local: "Subestação X",
-  inicioPrevisto: new Date("2026-10-24T11:00:00.000Z"),
+  inicioPrevisto: new Date("2026-10-24T12:00:00.000Z"),
 }
 
 describe("buildNotificationContent — SERVICE_UPCOMING", () => {
@@ -22,7 +22,7 @@ describe("buildNotificationContent — SERVICE_UPCOMING", () => {
     expect(content.url).toBe("/dashboard")
   })
 
-  it("formata o início previsto no fuso do Brasil", () => {
+  it("formata o início previsto no fuso de Rondônia", () => {
     const content = buildNotificationContent("SERVICE_UPCOMING", DEMAND)
 
     expect(content.body).toBe(

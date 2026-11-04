@@ -14,12 +14,9 @@ import {
 } from "@/lib/reports"
 
 describe("report date params", () => {
-  it("converte início e fim do dia para ISO", () => {
-    const start = toIsoStartOfDay("2026-05-01")
-    const end = toIsoEndOfDay("2026-05-01")
-
-    expect(new Date(start).getHours()).toBe(0)
-    expect(new Date(end).getHours()).toBe(23)
+  it("converte início e fim do dia no fuso da empresa para ISO", () => {
+    expect(toIsoStartOfDay("2026-05-01")).toBe("2026-05-01T04:00:00.000Z")
+    expect(toIsoEndOfDay("2026-05-01")).toBe("2026-05-02T03:59:59.999Z")
   })
 
   it("monta query string de período", () => {
@@ -33,6 +30,14 @@ describe("report date params", () => {
   it("fornece intervalo padrão do mês corrente", () => {
     const range = defaultReportDateInputs()
     expect(range.inicio <= range.fim).toBe(true)
+  })
+
+  it("usa o dia da empresa para o intervalo padrão", () => {
+    // 01/12 02:00 UTC ainda é 30/11 em Vilhena
+    expect(defaultReportDateInputs(new Date("2026-12-01T02:00:00.000Z"))).toEqual({
+      inicio: "2026-11-01",
+      fim: "2026-11-30",
+    })
   })
 
   it("rejeita intervalo sem datas", () => {
