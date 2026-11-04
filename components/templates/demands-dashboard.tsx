@@ -44,9 +44,12 @@ import {
 import { useSession } from "@/hooks/use-session"
 import {
   buildCalendarDays,
-  enumerateDateKeysLocal,
+  calendarDateOfInstant,
+  enumerateDateKeys,
+  fromDateTimeLocalValue,
   getDateKey,
   toDateTimeLocalValue,
+  todayCalendarDate,
 } from "@/lib/calendar"
 import {
   apiCreateDemand,
@@ -94,10 +97,10 @@ export function DemandsDashboard() {
   const [mobileMainView, setMobileMainView] =
     useState<DashboardMobileMainView>("day")
   const [currentMonth, setCurrentMonth] = useState(() => {
-    const now = new Date()
-    return new Date(now.getFullYear(), now.getMonth(), 1)
+    const today = todayCalendarDate()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
   })
-  const [selectedDate, setSelectedDate] = useState(() => new Date())
+  const [selectedDate, setSelectedDate] = useState(() => todayCalendarDate())
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -122,7 +125,7 @@ export function DemandsDashboard() {
 
         if (session.role === "eletricista") {
           setSelectedTechnician(session.name)
-          const today = new Date()
+          const today = todayCalendarDate()
           setSelectedDate(today)
           setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
         }
@@ -202,7 +205,7 @@ export function DemandsDashboard() {
 
   const demandsByDate = useMemo(() => {
     return filteredDemands.reduce<Record<string, Demand[]>>((acc, demand) => {
-      const keys = enumerateDateKeysLocal(
+      const keys = enumerateDateKeys(
         new Date(demand.horarioInicio),
         new Date(demand.horarioFim),
       )
@@ -232,7 +235,7 @@ export function DemandsDashboard() {
       ) {
         return prev
       }
-      const today = new Date()
+      const today = todayCalendarDate()
       if (
         today.getFullYear() === nextMonth.getFullYear() &&
         today.getMonth() === nextMonth.getMonth()
@@ -288,7 +291,7 @@ export function DemandsDashboard() {
     try {
       const response = await apiCreateDemand(newDemand)
       const createdDemand = response.data.demand
-      const createdAt = new Date(createdDemand.horarioInicio)
+      const createdAt = calendarDateOfInstant(new Date(createdDemand.horarioInicio))
 
       setDemands((currentDemands) => [...currentDemands, createdDemand])
       setSelectedDate(createdAt)
@@ -402,10 +405,16 @@ export function DemandsDashboard() {
       return
     }
 
-    const nextSchedule = new Date(scheduleValue).toISOString()
+    let nextSchedule: string
+    try {
+      nextSchedule = fromDateTimeLocalValue(scheduleValue)
+    } catch {
+      setScheduleError("Informe uma data e hora válidas.")
+      return
+    }
     const durationMinutes = parseDurationDisplayMinutes(duracaoPrevista)
     const nextEndTime = durationMinutes
-      ? new Date(new Date(scheduleValue).getTime() + durationMinutes * 60_000).toISOString()
+      ? new Date(new Date(nextSchedule).getTime() + durationMinutes * 60_000).toISOString()
       : editingDemand.horarioFim
 
     const truncateToMinute = (iso: string) => iso.slice(0, 16)

@@ -3,7 +3,7 @@ import { DemandStatus, UserRole } from "@prisma/client"
 import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
-import { enumerateDateKeysUtc } from "@/lib/server/dates"
+import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import {
   toDemandDto,
   updateStatusSchema,
@@ -138,7 +138,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   return jsonOk({
     demand: {
       ...dto,
-      dateKeys: enumerateDateKeysUtc(updated.inicioPrevisto, updated.fimPrevisto),
+      dateKeys: enumerateDateKeysInAppTz(updated.inicioPrevisto, updated.fimPrevisto),
     },
   })
 }

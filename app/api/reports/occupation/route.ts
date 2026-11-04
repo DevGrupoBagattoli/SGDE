@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import { requireManager } from "@/lib/server/auth"
-import { enumerateDateKeysUtc } from "@/lib/server/dates"
+import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     orderBy: { inicioPrevisto: "asc" },
   })
 
-  const dateRange = enumerateDateKeysUtc(start, end)
+  const dateRange = enumerateDateKeysInAppTz(start, end)
 
   // Map: technicianId → { name, equipe, days: { dateKey → count } }
   type TechEntry = {
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
     }
 
     const entry = techMap.get(key)!
-    const demandKeys = enumerateDateKeysUtc(d.inicioPrevisto, d.fimPrevisto)
+    const demandKeys = enumerateDateKeysInAppTz(d.inicioPrevisto, d.fimPrevisto)
 
     for (const dk of demandKeys) {
       if (dk in entry.days) {

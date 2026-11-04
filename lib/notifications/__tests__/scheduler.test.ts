@@ -247,7 +247,7 @@ describe("dispatchPendingNotifications — envio", () => {
       demandId: "demand-1",
       content: {
         title: "Serviço começa em instantes",
-        body: "Subestação X — Manutenção preventiva (início previsto às 09:10)",
+        body: "Subestação X — Manutenção preventiva (início previsto às 08:10)",
         url: "/dashboard",
         tag: "SERVICE_UPCOMING:demand-1",
       },

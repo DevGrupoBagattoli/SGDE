@@ -1,4 +1,5 @@
 import { roleLabels, type UserRole } from "@/lib/auth"
+import { formatAppDateTime } from "@/lib/timezone"
 
 /** Rótulos de ação de auditoria (chave = valor gravado no banco). */
 export const auditActionLabels: Record<string, string> = {
@@ -31,13 +32,8 @@ export const auditDemandStatusLabels: Record<string, string> = {
   CANCELLED: "Cancelado",
 }
 
-const auditDateFormatter = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-})
+// Roda no servidor (relatório de auditoria e CSV): precisa do fuso da empresa
+// explícito, senão um servidor em UTC mostraria 12:00 para um horário das 08:00.
 
 export function formatAuditRole(role: string): string {
   if (role in roleLabels) {
@@ -66,7 +62,7 @@ export function formatAuditValue(field: string, value: string): string {
   if (field === "inicioPrevisto" || field === "fimPrevisto") {
     const date = new Date(trimmed)
     if (!Number.isNaN(date.getTime())) {
-      return auditDateFormatter.format(date)
+      return formatAppDateTime(date)
     }
   }
 

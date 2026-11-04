@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals"
 
 import {
   buildCalendarDays,
-  enumerateDateKeysLocal,
+  enumerateDateKeys,
+  fromDateTimeLocalValue,
   getDateKey,
   toDateTimeLocalValue,
 } from "@/lib/calendar"
@@ -14,26 +15,42 @@ describe("getDateKey", () => {
   })
 })
 
-describe("toDateTimeLocalValue", () => {
-  it("converte instante ISO para o mesmo relógio local que datetime-local usa ao salvar", () => {
-    const localValue = "2026-05-11T15:40"
-    const asIso = new Date(localValue).toISOString()
-    expect(toDateTimeLocalValue(asIso)).toBe(localValue)
+// Fuso da empresa: America/Porto_Velho (UTC-4).
+describe("toDateTimeLocalValue / fromDateTimeLocalValue", () => {
+  it("mostra o instante no relógio da empresa, não no do dispositivo", () => {
+    expect(toDateTimeLocalValue("2026-05-11T19:40:00.000Z")).toBe("2026-05-11T15:40")
+  })
+
+  it("interpreta o valor digitado no fuso da empresa", () => {
+    expect(fromDateTimeLocalValue("2026-05-11T15:40")).toBe("2026-05-11T19:40:00.000Z")
+  })
+
+  it("ida e volta preservam o valor", () => {
+    const value = "2026-11-04T08:00"
+    expect(toDateTimeLocalValue(fromDateTimeLocalValue(value))).toBe(value)
   })
 
   it("retorna string vazia para ISO inválido", () => {
     expect(toDateTimeLocalValue("not-a-date")).toBe("")
   })
+
+  it("lança para valor digitado inválido", () => {
+    expect(() => fromDateTimeLocalValue("")).toThrow()
+  })
 })
 
-describe("enumerateDateKeysLocal", () => {
-  it("inclui cada dia civil local entre início e fim", () => {
-    const start = new Date(2026, 4, 10, 22, 0, 0)
-    const end = new Date(2026, 4, 11, 6, 0, 0)
-    expect(enumerateDateKeysLocal(start, end)).toEqual([
-      "2026-05-10",
-      "2026-05-11",
-    ])
+describe("enumerateDateKeys", () => {
+  it("inclui cada dia civil da empresa entre início e fim", () => {
+    // 22:00 do dia 10 até 06:00 do dia 11 em Vilhena
+    const start = new Date("2026-05-11T02:00:00.000Z")
+    const end = new Date("2026-05-11T10:00:00.000Z")
+    expect(enumerateDateKeys(start, end)).toEqual(["2026-05-10", "2026-05-11"])
+  })
+
+  it("serviço às 21:00 fica no próprio dia (não no seguinte, como em UTC)", () => {
+    const start = new Date("2026-11-05T01:00:00.000Z") // 04/11 21:00 em Vilhena
+    const end = new Date("2026-11-05T02:00:00.000Z")
+    expect(enumerateDateKeys(start, end)).toEqual(["2026-11-04"])
   })
 })
 

@@ -1,4 +1,5 @@
 import type { NotificationContent, NotificationEventType } from "@/lib/notifications/types"
+import { appTimeFormatter } from "@/lib/timezone"
 
 export type NotificationDemand = {
   id: string
@@ -15,16 +16,9 @@ export type DemandEventContext = {
   unseenHours?: number    // horas sem leitura (escalonamento)
 }
 
-// As datas são persistidas como instantes UTC, mas os usuários estão no Brasil.
-// O fuso fixo evita que o horário exibido mude conforme o fuso do servidor
-// (um container em UTC mostraria 11:00 para um serviço previsto às 08:00).
-const TIME_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "America/Sao_Paulo",
-})
-
-const formatTime = (date: Date): string => TIME_FORMATTER.format(date)
+// A notificação é montada no servidor: o horário precisa sair no fuso da
+// empresa (lib/timezone), não no fuso do container.
+const formatTime = (date: Date): string => appTimeFormatter.format(date)
 
 export const buildNotificationContent = (
   type: NotificationEventType,

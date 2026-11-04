@@ -3,7 +3,7 @@ import { UserRole } from "@prisma/client"
 import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
-import { enumerateDateKeysUtc } from "@/lib/server/dates"
+import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import { toDemandDto, updateScheduleSchema, parseScheduleUpdateData } from "@/lib/server/demands"
 import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
@@ -208,7 +208,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     {
       demand: {
         ...dto,
-        dateKeys: enumerateDateKeysUtc(updated.inicioPrevisto, updated.fimPrevisto),
+        dateKeys: enumerateDateKeysInAppTz(updated.inicioPrevisto, updated.fimPrevisto),
       },
     },
     warnings
