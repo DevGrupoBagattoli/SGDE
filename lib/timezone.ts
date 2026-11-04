@@ -89,8 +89,16 @@ export const zonedWallTimeToDate = (
 ): Date => {
   const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute, second, millisecond)
   const firstGuess = wallAsUtc - offsetMsAt(wallAsUtc)
-  const secondOffset = offsetMsAt(firstGuess)
-  return new Date(wallAsUtc - secondOffset)
+  const result = wallAsUtc - offsetMsAt(firstGuess)
+
+  // Hora que não existe (relógio adiantado no início do horário de verão, ex.:
+  // America/Santiago pula de 24:00 para 01:00): o segundo passo voltaria para o
+  // dia anterior. Nesse caso usa o primeiro palpite, o primeiro instante depois
+  // do salto, como faz o navegador. Sem efeito em fusos sem horário de verão.
+  const p = getZonedParts(new Date(result))
+  const matches =
+    p.year === year && p.month === month && p.day === day && p.hour === hour && p.minute === minute
+  return new Date(matches ? result : firstGuess)
 }
 
 /** "YYYY-MM-DD" do dia civil do instante no fuso da empresa. */
@@ -180,16 +188,7 @@ export const appDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   timeZone: APP_TIME_ZONE,
 })
 
-export const appDateTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: APP_TIME_ZONE,
-})
-
-/** "dd/MM/yyyy HH:mm" no fuso da empresa (CSV, auditoria). */
+/** "dd/MM/yyyy HH:mm" no fuso da empresa. Formato único de data e hora (tela, CSV, auditoria). */
 export const formatAppDateTime = (date: Date): string => {
   const p = getZonedParts(date)
   return `${pad(p.day)}/${pad(p.month)}/${p.year} ${pad(p.hour)}:${pad(p.minute)}`

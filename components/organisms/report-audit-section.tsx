@@ -12,9 +12,7 @@ import {
 } from "@/components/ui/table"
 import { formatAuditRole } from "@/lib/audit-labels"
 import { type PaginatedSlice, type ReportAuditRow } from "@/lib/reports"
-import { appDateTimeFormatter } from "@/lib/timezone"
-
-const auditDateFormatter = appDateTimeFormatter
+import { formatAppDateTime } from "@/lib/timezone"
 
 type ReportAuditSectionProps = {
   loaded: boolean
@@ -80,7 +78,7 @@ function AuditTable({
           {rows.map((row) => (
             <TableRow key={row.id}>
               <TableCell className="whitespace-normal align-top text-xs tabular-nums sm:text-sm">
-                {auditDateFormatter.format(new Date(row.createdAt))}
+                {formatAppDateTime(new Date(row.createdAt))}
               </TableCell>
               <TableCell className="max-w-36 whitespace-normal align-top sm:max-w-44">
                 <span className="block font-medium text-slate-800">{row.ator}</span>
