@@ -3,6 +3,7 @@ import { DemandStatus, UserRole } from "@prisma/client"
 import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
+import { isActiveDemandStatus, scheduleConflictWarning } from "@/lib/server/demand-conflicts"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import {
   toDemandDto,
@@ -10,7 +11,7 @@ import {
   demandStatusToDb,
   demandStatusFromDb,
 } from "@/lib/server/demands"
-import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 type RouteParams = {
@@ -80,6 +81,21 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   }
 
   const nextStatus = demandStatusToDb(parsed.data.status)
+  const reactivates = !isActiveDemandStatus(demand.status) && isActiveDemandStatus(nextStatus)
+  const warnings: ApiWarning[] = []
+
+  if (reactivates) {
+    const warning = await scheduleConflictWarning(auth.user, {
+      start: demand.inicioPrevisto,
+      end: demand.fimPrevisto,
+      userIds: [demand.technicianId, ...demand.participants.map((p) => p.userId)],
+      excludeDemandId: demand.id,
+    })
+
+    if (warning) {
+      warnings.push(warning)
+    }
+  }
 
   const updated = await prisma.demand.update({
     where: { id: demand.id },
@@ -135,10 +151,13 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
   const dto = toDemandDto(updated)
 
-  return jsonOk({
-    demand: {
-      ...dto,
-      dateKeys: enumerateDateKeysInAppTz(updated.inicioPrevisto, updated.fimPrevisto),
+  return jsonOk(
+    {
+      demand: {
+        ...dto,
+        dateKeys: enumerateDateKeysInAppTz(updated.inicioPrevisto, updated.fimPrevisto),
+      },
     },
-  })
+    warnings
+  )
 }

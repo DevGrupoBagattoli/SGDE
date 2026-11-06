@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals"
 import { GET as getConflicts } from "@/app/api/demands/conflicts/route"
 import { POST as createDemand } from "@/app/api/demands/route"
 import { PATCH as updateSchedule } from "@/app/api/demands/[id]/schedule/route"
+import { PATCH as updateStatus } from "@/app/api/demands/[id]/status/route"
 import { requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { prisma } from "@/lib/server/prisma"
@@ -11,7 +12,8 @@ import { prisma } from "@/lib/server/prisma"
 jest.mock("@/lib/server/prisma", () => ({
   prisma: {
     user: { findUnique: jest.fn(), findMany: jest.fn() },
-    demand: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
+    demand: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+    notificationDelivery: { updateMany: jest.fn() },
     $transaction: jest.fn(),
   },
 }))
@@ -28,7 +30,8 @@ type Mock = jest.Mock<(...args: unknown[]) => Promise<unknown>>
 
 const db = prisma as unknown as {
   user: { findUnique: Mock; findMany: Mock }
-  demand: { findMany: Mock; findUnique: Mock; create: Mock }
+  demand: { findMany: Mock; findUnique: Mock; create: Mock; update: Mock }
+  notificationDelivery: { updateMany: Mock }
   $transaction: Mock
 }
 const requireAuthMock = requireAuth as unknown as Mock
@@ -286,6 +289,34 @@ describe("PATCH /api/demands/[id]/schedule - aviso de conflito de agenda", () =>
     expect(warning.message).not.toContain("João Silva")
   })
 
+  it("ao só adicionar alguém, avisa apenas das pessoas novas", async () => {
+    db.demand.findUnique.mockResolvedValue(
+      ownDemand({
+        inicioPrevisto: new Date(INICIO),
+        fimPrevisto: new Date("2026-05-11T16:00:00.000Z"),
+        participants: [{ userId: MARIA.id, user: MARIA }],
+      })
+    )
+    db.user.findMany.mockResolvedValue([MARIA, PEDRO])
+    // João e Maria já estavam ocupados no horário; Pedro é quem entra agora
+    db.demand.findMany.mockResolvedValue([
+      existing({
+        participants: [
+          { userId: MARIA.id, user: MARIA },
+          { userId: PEDRO.id, user: PEDRO },
+        ],
+      }),
+    ])
+
+    const response = await patchSchedule({ participantes: [MARIA.name, PEDRO.name] })
+    const [warning] = await warningsOf(response)
+
+    expect(response.status).toBe(200)
+    expect(warning.message).toContain("Pedro Lima")
+    expect(warning.message).not.toContain("Maria Souza")
+    expect(warning.message).not.toContain("João Silva")
+  })
+
   it("não checa quando só a observação muda", async () => {
     db.demand.findUnique.mockResolvedValue(
       ownDemand({
@@ -350,6 +381,76 @@ describe("PATCH /api/demands/[id]/schedule - aviso de conflito de agenda", () =>
     expect(warning.message).not.toContain("Bloco B")
     expect(warning.message).not.toContain("d-outro")
     expect(warning.message).not.toContain("09:00")
+  })
+})
+
+const patchStatus = (status: string) =>
+  updateStatus(
+    new Request("http://localhost/api/demands/d-1/status", {
+      method: "PATCH",
+      body: JSON.stringify({ status, version: 1 }),
+    }),
+    { params: Promise.resolve({ id: "d-1" }) }
+  )
+
+describe("PATCH /api/demands/[id]/status - aviso de conflito ao reativar", () => {
+  beforeEach(() => {
+    db.demand.findUnique.mockResolvedValue(
+      ownDemand({
+        status: "DONE",
+        inicioPrevisto: new Date(INICIO),
+        fimPrevisto: new Date("2026-05-11T16:00:00.000Z"),
+      })
+    )
+    db.demand.update.mockResolvedValue({ ...createdDemand(), id: "d-1", version: 2 })
+    db.notificationDelivery.updateMany.mockResolvedValue({ count: 0 })
+  })
+
+  it("reativar um chamado concluído em horário ocupado salva e avisa", async () => {
+    db.demand.findMany.mockResolvedValue([existing()])
+
+    const response = await patchStatus("Pendente")
+    const warnings = await warningsOf(response)
+
+    expect(response.status).toBe(200)
+    expect(db.demand.update).toHaveBeenCalledTimes(1)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe("SCHEDULE_CONFLICT")
+    expect(warnings[0].message).toContain("João Silva")
+    expect(db.demand.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: { not: "d-1" } }),
+      })
+    )
+  })
+
+  it("reativar sem ninguém ocupado salva sem aviso", async () => {
+    const response = await patchStatus("Em Andamento")
+
+    expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
+  })
+
+  it("não consulta conflito quando o chamado já estava ativo", async () => {
+    db.demand.findUnique.mockResolvedValue(ownDemand({ status: "PENDING" }))
+    db.demand.findMany.mockResolvedValue([existing()])
+
+    const response = await patchStatus("Em Andamento")
+
+    expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
+    expect(db.demand.findMany).not.toHaveBeenCalled()
+  })
+
+  it("não consulta conflito ao concluir ou cancelar", async () => {
+    db.demand.findUnique.mockResolvedValue(ownDemand({ status: "PENDING" }))
+    db.demand.findMany.mockResolvedValue([existing()])
+
+    const response = await patchStatus("Concluído")
+
+    expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
+    expect(db.demand.findMany).not.toHaveBeenCalled()
   })
 })
 
