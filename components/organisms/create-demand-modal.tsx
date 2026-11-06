@@ -67,9 +67,9 @@ export function CreateDemandModal({
     }
   }, [horarioInicio])
 
-  // Só avisa, não impede de salvar. Concluído ou cancelado não ocupa ninguém.
+  const occupiesSchedule = status === "Pendente" || status === "Em Andamento"
   const { conflicts } = useScheduleConflicts({
-    enabled: status === "Pendente" || status === "Em Andamento",
+    enabled: occupiesSchedule,
     inicio: inicioIso,
     duracao: duracaoPreview,
     usuarios: tecnico ? [tecnico] : [],
