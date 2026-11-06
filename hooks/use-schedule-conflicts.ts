@@ -23,15 +23,19 @@ export function useScheduleConflicts({
   usuarios,
   excluir,
 }: UseScheduleConflictsParams) {
-  const [result, setResult] = useState<{ key: string; conflicts: ScheduleConflictDto[] }>({
-    key: "",
-    conflicts: [],
-  })
+  const [conflicts, setConflicts] = useState<ScheduleConflictDto[]>([])
 
   const usuariosKey = [...usuarios].sort().join(SEPARATOR)
   const key = enabled && inicio && usuariosKey
     ? [inicio, duracao, usuariosKey, excluir ?? ""].join(SEPARATOR)
     : null
+
+  const [previousKey, setPreviousKey] = useState(key)
+
+  if (previousKey !== key) {
+    setPreviousKey(key)
+    if (key === null) setConflicts([])
+  }
 
   useEffect(() => {
     if (!key) return
@@ -47,11 +51,11 @@ export function useScheduleConflicts({
         },
         controller.signal
       )
-        .then((conflicts) => {
-          if (!controller.signal.aborted) setResult({ key, conflicts })
+        .then((found) => {
+          if (!controller.signal.aborted) setConflicts(found)
         })
         .catch(() => {
-          if (!controller.signal.aborted) setResult({ key, conflicts: [] })
+          if (!controller.signal.aborted) setConflicts([])
         })
     }, DEBOUNCE_MS)
 
@@ -61,10 +65,5 @@ export function useScheduleConflicts({
     }
   }, [key, inicio, duracao, usuariosKey, excluir])
 
-  const isCurrent = key !== null && result.key === key
-
-  return {
-    conflicts: isCurrent ? result.conflicts : [],
-    isChecking: key !== null && !isCurrent,
-  }
+  return { conflicts }
 }
