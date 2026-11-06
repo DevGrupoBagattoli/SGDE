@@ -3,13 +3,16 @@
 import { FormEvent, useMemo, useState } from "react"
 import { X } from "lucide-react"
 
+import { ScheduleConflictAlert } from "@/components/molecules/schedule-conflict-alert"
 import { Button } from "@/components/ui/button"
+import { useScheduleConflicts } from "@/hooks/use-schedule-conflicts"
 import { UserSession } from "@/lib/auth"
 import { fromDateTimeLocalValue } from "@/lib/calendar"
 import {
   Demand,
   DemandStatus,
   formatDuracaoFromParts,
+  ScheduleConflictDto,
   statusOptions,
 } from "@/lib/demands"
 
@@ -21,7 +24,11 @@ type CreateDemandModalProps = {
   session: UserSession
   technicians: string[]
   onClose: () => void
-  onCreate: (demand: CreateDemandInput) => Promise<void> | void
+  /** Devolve os conflitos quando o servidor recusa por agenda ocupada (o modal fica aberto). */
+  onCreate: (
+    demand: CreateDemandInput,
+    confirmarConflito: boolean
+  ) => Promise<ScheduleConflictDto[] | void> | ScheduleConflictDto[] | void
 }
 
 const clamp = (n: number, min: number, max: number) =>
@@ -57,20 +64,58 @@ export function CreateDemandModal({
   const isTechnicianLocked = session.role === "eletricista"
   const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const inicioIso = useMemo(() => {
+    try {
+      return fromDateTimeLocalValue(horarioInicio)
+    } catch {
+      return ""
+    }
+  }, [horarioInicio])
+
+  // Chamado concluído ou cancelado não ocupa ninguém: não há o que avisar.
+  const { conflicts: precheckConflicts } = useScheduleConflicts({
+    enabled: status === "Pendente" || status === "Em Andamento",
+    inicio: inicioIso,
+    duracao: duracaoPreview,
+    usuarios: tecnico ? [tecnico] : [],
+  })
+
+  // Conflito devolvido pelo servidor no salvamento; vale só enquanto os dados não mudam.
+  const signature = [tecnico, inicioIso, duracaoPreview, status].join("|")
+  const [saveConflicts, setSaveConflicts] = useState<{
+    signature: string
+    conflicts: ScheduleConflictDto[]
+  } | null>(null)
+
+  const conflicts =
+    precheckConflicts.length > 0
+      ? precheckConflicts
+      : saveConflicts?.signature === signature
+        ? saveConflicts.conflicts
+        : []
+  const hasConflicts = conflicts.length > 0
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    onCreate({
-      tecnico,
-      equipe: "Sem equipe",
-      local: local.trim(),
-      descricao: descricao.trim(),
-      horarioInicio: fromDateTimeLocalValue(horarioInicio),
-      duracaoPrevista: duracaoPreview,
-      status,
-      observacoes: observacoes.trim(),
-      participantes: [],
-    })
+    const refused = await onCreate(
+      {
+        tecnico,
+        equipe: "Sem equipe",
+        local: local.trim(),
+        descricao: descricao.trim(),
+        horarioInicio: fromDateTimeLocalValue(horarioInicio),
+        duracaoPrevista: duracaoPreview,
+        status,
+        observacoes: observacoes.trim(),
+        participantes: [],
+      },
+      hasConflicts
+    )
+
+    if (refused && refused.length > 0) {
+      setSaveConflicts({ signature, conflicts: refused })
+    }
   }
 
   return (
@@ -236,12 +281,22 @@ export function CreateDemandModal({
           </label>
         </div>
 
+        {hasConflicts ? (
+          <div className="mt-4">
+            <ScheduleConflictAlert conflicts={conflicts} />
+          </div>
+        ) : null}
+
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Criando…" : "Criar chamado"}
+          <Button
+            className={hasConflicts ? "bg-amber-600 text-white hover:bg-amber-700" : undefined}
+            type="submit"
+            disabled={isSaving}
+          >
+            {isSaving ? "Criando…" : hasConflicts ? "Salvar mesmo assim" : "Criar chamado"}
           </Button>
         </div>
       </form>

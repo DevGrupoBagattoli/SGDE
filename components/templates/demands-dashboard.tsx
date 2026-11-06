@@ -59,6 +59,7 @@ import {
   apiUpdateDescricao,
   apiUpdateSchedule,
   apiUpdateStatus,
+  scheduleConflictsFromError,
 } from "@/lib/api"
 import {
   Demand,
@@ -66,6 +67,7 @@ import {
   matchesTechnicianDashboardFilter,
   parseDurationDisplayMinutes,
   sameParticipants,
+  ScheduleConflictDto,
   statusLabels,
   type SummaryDetailSegment,
   validateDemandDescricao,
@@ -281,15 +283,16 @@ export function DemandsDashboard() {
   }
 
   const handleCreateDemand = async (
-    newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">
-  ) => {
+    newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">,
+    confirmarConflito: boolean
+  ): Promise<ScheduleConflictDto[] | void> => {
     if (isSaving) return
     setGlobalError("")
     setRequestWarning("")
     setIsSaving(true)
 
     try {
-      const response = await apiCreateDemand(newDemand)
+      const response = await apiCreateDemand({ ...newDemand, confirmarConflito })
       const createdDemand = response.data.demand
       const createdAt = calendarDateOfInstant(new Date(createdDemand.horarioInicio))
 
@@ -307,6 +310,12 @@ export function DemandsDashboard() {
 
       setIsCreateModalOpen(false)
     } catch (error) {
+      // Agenda ocupada: o modal segue aberto mostrando o aviso e "Salvar mesmo assim".
+      const conflicts = scheduleConflictsFromError(error)
+      if (conflicts) {
+        return conflicts
+      }
+
       setGlobalError(
         error instanceof Error ? error.message : "Falha ao criar demanda"
       )
@@ -397,8 +406,9 @@ export function DemandsDashboard() {
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string,
-    nextStatus: DemandStatus
-  ) => {
+    nextStatus: DemandStatus,
+    confirmarConflito: boolean
+  ): Promise<ScheduleConflictDto[] | void> => {
     event.preventDefault()
 
     if (!editingDemand || isSaving) {
@@ -487,6 +497,8 @@ export function DemandsDashboard() {
           observacoes: trimmedObservacoes,
           participantes,
           version: currentDemand.version,
+          status: nextStatus,
+          confirmarConflito,
         })
 
         const updatedDemand = response.data.demand
@@ -527,6 +539,12 @@ export function DemandsDashboard() {
 
       setEditingDemand(null)
     } catch (error) {
+      // Agenda ocupada: mantém o que a pessoa digitou e deixa confirmar no próprio modal.
+      const conflicts = scheduleConflictsFromError(error)
+      if (conflicts) {
+        return conflicts
+      }
+
       const baseMessage =
         error instanceof Error ? error.message : "Falha ao atualizar demanda"
       const savedParts = [

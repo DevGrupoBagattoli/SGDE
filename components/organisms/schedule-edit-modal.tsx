@@ -1,14 +1,18 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useMemo, useState } from "react"
 import { UserPlus, X } from "lucide-react"
 
+import { ScheduleConflictAlert } from "@/components/molecules/schedule-conflict-alert"
 import { Button } from "@/components/ui/button"
+import { useScheduleConflicts } from "@/hooks/use-schedule-conflicts"
+import { fromDateTimeLocalValue } from "@/lib/calendar"
 import {
   Demand,
   DemandStatus,
   formatDuracaoFromParts,
   parseDuracaoParts,
+  ScheduleConflictDto,
   statusOptions,
 } from "@/lib/demands"
 
@@ -26,13 +30,18 @@ type ScheduleEditModalProps = {
   onDescricaoChange?: (value: string) => void
   onObservationChange: (value: string) => void
   onScheduleChange: (value: string) => void
+  /** Devolve os conflitos quando o servidor recusa por agenda ocupada (o modal fica aberto). */
   onSubmit: (
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string,
-    status: DemandStatus
-  ) => Promise<void> | void
+    status: DemandStatus,
+    confirmarConflito: boolean
+  ) => Promise<ScheduleConflictDto[] | void> | ScheduleConflictDto[] | void
 }
+
+const isActiveStatus = (status: DemandStatus) =>
+  status === "Pendente" || status === "Em Andamento"
 
 const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.floor(Number.isFinite(n) ? n : 0)))
@@ -73,6 +82,59 @@ function ScheduleEditModalForm({
 
   const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
 
+  const inicioIso = useMemo(() => {
+    try {
+      return fromDateTimeLocalValue(scheduleValue)
+    } catch {
+      return ""
+    }
+  }, [scheduleValue])
+
+  // Espelha a regra do servidor: só checa quando algo que afeta a ocupação muda.
+  const startChanged = inicioIso.slice(0, 16) !== demand.horarioInicio.slice(0, 16)
+  const durationChanged = duracaoPreview !== demand.duracaoPrevista
+  const addsPeople = participantes.some((name) => !demand.participantes.includes(name))
+  const reactivates = !isActiveStatus(demand.status) && isActiveStatus(statusValue)
+
+  const { conflicts: precheckConflicts } = useScheduleConflicts({
+    enabled:
+      isActiveStatus(statusValue) &&
+      (startChanged || durationChanged || addsPeople || reactivates),
+    inicio: inicioIso,
+    duracao: duracaoPreview,
+    usuarios: [demand.tecnico, ...participantes],
+    excluir: demand.id,
+  })
+
+  // Conflito devolvido pelo servidor no salvamento; vale só enquanto os dados não mudam.
+  const signature = [scheduleValue, duracaoPreview, participantes.join(","), statusValue].join("|")
+  const [saveConflicts, setSaveConflicts] = useState<{
+    signature: string
+    conflicts: ScheduleConflictDto[]
+  } | null>(null)
+
+  const conflicts =
+    precheckConflicts.length > 0
+      ? precheckConflicts
+      : saveConflicts?.signature === signature
+        ? saveConflicts.conflicts
+        : []
+  const hasConflicts = conflicts.length > 0
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    const refused = await onSubmit(
+      event,
+      participantes,
+      duracaoPreview,
+      statusValue,
+      hasConflicts
+    )
+
+    if (refused && refused.length > 0) {
+      setSaveConflicts({ signature, conflicts: refused })
+    }
+  }
+
   const available = allTechnicians.filter(
     (t) => t !== demand.tecnico && !participantes.includes(t)
   )
@@ -96,9 +158,7 @@ function ScheduleEditModalForm({
     >
       <form
         className="max-h-[90svh] w-full max-w-lg overflow-x-hidden overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
-        onSubmit={(e) =>
-          onSubmit(e, participantes, duracaoPreview, statusValue)
-        }
+        onSubmit={handleSubmit}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -230,6 +290,8 @@ function ScheduleEditModalForm({
             />
           </label>
 
+          {hasConflicts ? <ScheduleConflictAlert conflicts={conflicts} /> : null}
+
           {error ? (
             <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {error}
@@ -300,8 +362,12 @@ function ScheduleEditModalForm({
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Salvando…" : "Salvar alteração"}
+          <Button
+            className={hasConflicts ? "bg-amber-600 text-white hover:bg-amber-700" : undefined}
+            type="submit"
+            disabled={isSaving}
+          >
+            {isSaving ? "Salvando…" : hasConflicts ? "Salvar mesmo assim" : "Salvar alteração"}
           </Button>
         </div>
       </form>
