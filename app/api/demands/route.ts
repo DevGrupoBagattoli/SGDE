@@ -183,11 +183,10 @@ export async function POST(request: Request) {
     })
   }
 
-  // Só avisa, não impede: o chamado é salvo e a resposta leva o aviso.
-  // Chamado já nascido como concluído/cancelado não ocupa ninguém.
+  const shouldCheckConflicts = isActiveDemandStatus(parsedDate.dbStatus)
   const warnings: ApiWarning[] = []
 
-  if (isActiveDemandStatus(parsedDate.dbStatus)) {
+  if (shouldCheckConflicts) {
     const warning = await scheduleConflictWarning(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,

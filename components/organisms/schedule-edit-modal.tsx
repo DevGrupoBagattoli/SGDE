@@ -87,17 +87,15 @@ function ScheduleEditModalForm({
     }
   }, [scheduleValue])
 
-  // Espelha a regra do servidor: só checa quando algo que afeta a ocupação muda.
   const startChanged = inicioIso.slice(0, 16) !== demand.horarioInicio.slice(0, 16)
   const durationChanged = duracaoPreview !== demand.duracaoPrevista
   const addsPeople = participantes.some((name) => !demand.participantes.includes(name))
   const reactivates = !isActiveStatus(demand.status) && isActiveStatus(statusValue)
 
-  // Só avisa, não impede de salvar.
+  const shouldCheckConflicts =
+    isActiveStatus(statusValue) && (startChanged || durationChanged || addsPeople || reactivates)
   const { conflicts } = useScheduleConflicts({
-    enabled:
-      isActiveStatus(statusValue) &&
-      (startChanged || durationChanged || addsPeople || reactivates),
+    enabled: shouldCheckConflicts,
     inicio: inicioIso,
     duracao: duracaoPreview,
     usuarios: [demand.tecnico, ...participantes],

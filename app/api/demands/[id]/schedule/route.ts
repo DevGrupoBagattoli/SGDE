@@ -109,7 +109,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     },
   })
 
-  // Status que o chamado terá ao salvar (a troca em si é feita pela rota de status).
   const effectiveStatus = parsed.data.status
     ? demandStatusToDb(parsed.data.status)
     : demand.status
@@ -118,15 +117,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const reactivates =
     !isActiveDemandStatus(demand.status) && isActiveDemandStatus(effectiveStatus)
 
-  // Só avisa, não impede: o remanejamento é salvo e a resposta leva o aviso.
-  // Só checa quando algo que afeta a ocupação muda; senão editar uma observação
-  // repetiria o aviso de um conflito que já existia antes.
+  const shouldCheckConflicts =
+    isActiveDemandStatus(effectiveStatus) && (parsedDate.moved || addsPeople || reactivates)
   const warnings: ApiWarning[] = []
 
-  if (
-    isActiveDemandStatus(effectiveStatus) &&
-    (parsedDate.moved || addsPeople || reactivates)
-  ) {
+  if (shouldCheckConflicts) {
     const warning = await scheduleConflictWarning(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,
