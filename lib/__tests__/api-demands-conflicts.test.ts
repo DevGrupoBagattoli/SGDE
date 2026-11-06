@@ -107,48 +107,34 @@ beforeEach(() => {
   db.demand.create.mockResolvedValue(createdDemand())
 })
 
-describe("POST /api/demands - conflito de agenda", () => {
+/** Avisos de agenda que acompanham a resposta de sucesso. */
+const warningsOf = async (response: Response) =>
+  ((await response.json()) as { warnings: Array<{ code: string; message: string }> }).warnings
+
+describe("POST /api/demands - aviso de conflito de agenda", () => {
   it("salva sem aviso quando ninguém está ocupado", async () => {
     const response = await post({})
 
     expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
     expect(db.demand.create).toHaveBeenCalledTimes(1)
   })
 
-  it("retorna 409 com os conflitos e não salva", async () => {
+  it("salva mesmo com conflito e devolve o aviso", async () => {
     db.demand.findMany.mockResolvedValue([existing()])
 
     const response = await post({})
-    const body = (await response.json()) as {
-      error: { code: string; message: string; details: { reason: string; conflitos: unknown[] } }
-    }
+    const warnings = await warningsOf(response)
 
-    expect(response.status).toBe(409)
-    expect(body.error.code).toBe("CONFLICT")
-    expect(body.error.message).toContain("João Silva")
-    expect(body.error.message).toContain("Bloco B")
-    expect(body.error.details.reason).toBe("SCHEDULE_CONFLICT")
-    expect(body.error.details.conflitos).toEqual([
-      {
-        userId: JOAO.id,
-        userName: JOAO.name,
-        demandId: "d-outro",
-        local: "Bloco B",
-        inicio: "2026-05-11T13:00:00.000Z",
-        fim: "2026-05-11T15:00:00.000Z",
-        restrito: false,
-      },
-    ])
-    expect(db.demand.create).not.toHaveBeenCalled()
-  })
-
-  it("não deixa forçar o salvamento mandando confirmarConflito", async () => {
-    db.demand.findMany.mockResolvedValue([existing()])
-
-    const response = await post({ confirmarConflito: true })
-
-    expect(response.status).toBe(409)
-    expect(db.demand.create).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(db.demand.create).toHaveBeenCalledTimes(1)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe("SCHEDULE_CONFLICT")
+    expect(warnings[0].message).toContain("Este horário está ocupado por uma atividade já marcada")
+    expect(warnings[0].message).toContain("João Silva")
+    expect(warnings[0].message).toContain("Bloco B")
+    // 09:00 a 11:00 em Vilhena (UTC-4)
+    expect(warnings[0].message).toContain("11/05/2026 09:00 – 11:00")
   })
 
   it("acusa conflito só do participante", async () => {
@@ -162,12 +148,11 @@ describe("POST /api/demands - conflito de agenda", () => {
     ])
 
     const response = await post({ participantes: [MARIA.name] })
-    const body = (await response.json()) as {
-      error: { details: { conflitos: Array<{ userName: string }> } }
-    }
+    const [warning] = await warningsOf(response)
 
-    expect(response.status).toBe(409)
-    expect(body.error.details.conflitos.map((c) => c.userName)).toEqual([MARIA.name])
+    expect(response.status).toBe(200)
+    expect(warning.message).toContain("Maria Souza")
+    expect(warning.message).not.toContain("João Silva")
   })
 
   it("lista todas as pessoas ocupadas", async () => {
@@ -177,14 +162,10 @@ describe("POST /api/demands - conflito de agenda", () => {
     ])
 
     const response = await post({ participantes: [MARIA.name] })
-    const body = (await response.json()) as {
-      error: { details: { conflitos: Array<{ userName: string }> } }
-    }
+    const [warning] = await warningsOf(response)
 
-    expect(body.error.details.conflitos.map((c) => c.userName).sort()).toEqual([
-      JOAO.name,
-      MARIA.name,
-    ])
+    expect(warning.message).toContain("João Silva")
+    expect(warning.message).toContain("Maria Souza")
   })
 
   it("não consulta conflito quando o chamado nasce concluído", async () => {
@@ -193,6 +174,7 @@ describe("POST /api/demands - conflito de agenda", () => {
     const response = await post({ status: "Concluído" })
 
     expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
     expect(db.demand.findMany).not.toHaveBeenCalled()
   })
 })
@@ -233,7 +215,7 @@ const tx = {
   demandAudit: { createMany: jest.fn() as Mock },
 }
 
-describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
+describe("PATCH /api/demands/[id]/schedule - aviso de conflito de agenda", () => {
   beforeEach(() => {
     db.demand.findUnique.mockResolvedValue(ownDemand())
     db.$transaction.mockImplementation(async (callback: unknown) =>
@@ -252,6 +234,7 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     const response = await patchSchedule({})
 
     expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
     expect(db.$transaction).toHaveBeenCalledTimes(1)
   })
 
@@ -263,6 +246,7 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     const response = await patchSchedule({})
 
     expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
     expect(db.demand.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ id: { not: "d-1" } }),
@@ -270,28 +254,18 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     )
   })
 
-  it("retorna 409 com os conflitos e não salva", async () => {
+  it("salva mesmo com conflito e devolve o aviso", async () => {
     db.demand.findMany.mockResolvedValue([existing()])
 
     const response = await patchSchedule({})
-    const body = (await response.json()) as {
-      error: { code: string; details: { reason: string; conflitos: Array<{ userName: string }> } }
-    }
+    const warnings = await warningsOf(response)
 
-    expect(response.status).toBe(409)
-    expect(body.error.code).toBe("CONFLICT")
-    expect(body.error.details.reason).toBe("SCHEDULE_CONFLICT")
-    expect(body.error.details.conflitos.map((c) => c.userName)).toEqual([JOAO.name])
-    expect(db.$transaction).not.toHaveBeenCalled()
-  })
-
-  it("não deixa forçar o salvamento mandando confirmarConflito", async () => {
-    db.demand.findMany.mockResolvedValue([existing()])
-
-    const response = await patchSchedule({ confirmarConflito: true })
-
-    expect(response.status).toBe(409)
-    expect(db.$transaction).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(db.$transaction).toHaveBeenCalledTimes(1)
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0].code).toBe("SCHEDULE_CONFLICT")
+    expect(warnings[0].message).toContain("João Silva")
+    expect(warnings[0].message).toContain("Bloco B")
   })
 
   it("checa os participantes que ficam depois da edição", async () => {
@@ -305,12 +279,11 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     ])
 
     const response = await patchSchedule({ participantes: [MARIA.name] })
-    const body = (await response.json()) as {
-      error: { details: { conflitos: Array<{ userName: string }> } }
-    }
+    const [warning] = await warningsOf(response)
 
-    expect(response.status).toBe(409)
-    expect(body.error.details.conflitos.map((c) => c.userName)).toEqual([MARIA.name])
+    expect(response.status).toBe(200)
+    expect(warning.message).toContain("Maria Souza")
+    expect(warning.message).not.toContain("João Silva")
   })
 
   it("não checa quando só a observação muda", async () => {
@@ -325,10 +298,11 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     const response = await patchSchedule({ observacoes: "Só uma nota" })
 
     expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
     expect(db.demand.findMany).not.toHaveBeenCalled()
   })
 
-  it("checa ao reativar um chamado concluído", async () => {
+  it("avisa ao reativar um chamado concluído", async () => {
     db.demand.findUnique.mockResolvedValue(
       ownDemand({
         status: "DONE",
@@ -340,7 +314,8 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
 
     const response = await patchSchedule({ status: "Pendente", observacoes: "" })
 
-    expect(response.status).toBe(409)
+    expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toHaveLength(1)
   })
 
   it("não checa chamado concluído que continua concluído", async () => {
@@ -350,6 +325,7 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     const response = await patchSchedule({})
 
     expect(response.status).toBe(200)
+    expect(await warningsOf(response)).toEqual([])
     expect(db.demand.findMany).not.toHaveBeenCalled()
   })
 
@@ -366,24 +342,14 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     ])
 
     const response = await patchSchedule({ participantes: [MARIA.name] })
-    const body = (await response.json()) as {
-      error: { message: string; details: { conflitos: Array<Record<string, unknown>> } }
-    }
+    const [warning] = await warningsOf(response)
 
-    expect(response.status).toBe(409)
-    expect(body.error.details.conflitos).toEqual([
-      {
-        userId: MARIA.id,
-        userName: MARIA.name,
-        demandId: null,
-        local: null,
-        inicio: null,
-        fim: null,
-        restrito: true,
-      },
-    ])
-    expect(body.error.message).not.toContain("Bloco B")
-    expect(body.error.message).not.toContain("d-outro")
+    expect(response.status).toBe(200)
+    expect(warning.message).toContain("Maria Souza")
+    expect(warning.message).toContain("ocupado(a) em outro chamado")
+    expect(warning.message).not.toContain("Bloco B")
+    expect(warning.message).not.toContain("d-outro")
+    expect(warning.message).not.toContain("09:00")
   })
 })
 

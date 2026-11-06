@@ -5,18 +5,14 @@ import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canViewDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
-import {
-  findBlockingScheduleConflicts,
-  isActiveDemandStatus,
-  SCHEDULE_CONFLICT_REASON,
-} from "@/lib/server/demand-conflicts"
+import { isActiveDemandStatus, scheduleConflictWarning } from "@/lib/server/demand-conflicts"
 import {
   createDemandSchema,
   demandsWhereForUser,
   parseCreateDemandData,
   toDemandDto,
 } from "@/lib/server/demands"
-import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 const querySchema = z.object({
@@ -187,19 +183,19 @@ export async function POST(request: Request) {
     })
   }
 
+  // Só avisa, não impede: o chamado é salvo e a resposta leva o aviso.
   // Chamado já nascido como concluído/cancelado não ocupa ninguém.
+  const warnings: ApiWarning[] = []
+
   if (isActiveDemandStatus(parsedDate.dbStatus)) {
-    const blocking = await findBlockingScheduleConflicts(auth.user, {
+    const warning = await scheduleConflictWarning(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,
       userIds: [technician.id, ...participants.map((participant) => participant.id)],
     })
 
-    if (blocking) {
-      return jsonError(409, "CONFLICT", blocking.message, {
-        reason: SCHEDULE_CONFLICT_REASON,
-        conflitos: blocking.visible,
-      })
+    if (warning) {
+      warnings.push(warning)
     }
   }
 
@@ -258,6 +254,6 @@ export async function POST(request: Request) {
         dateKeys: enumerateDateKeysInAppTz(created.inicioPrevisto, created.fimPrevisto),
       },
     },
-    []
+    warnings
   )
 }

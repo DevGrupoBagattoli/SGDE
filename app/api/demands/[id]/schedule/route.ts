@@ -4,18 +4,14 @@ import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
-import {
-  findBlockingScheduleConflicts,
-  isActiveDemandStatus,
-  SCHEDULE_CONFLICT_REASON,
-} from "@/lib/server/demand-conflicts"
+import { isActiveDemandStatus, scheduleConflictWarning } from "@/lib/server/demand-conflicts"
 import {
   demandStatusToDb,
   parseScheduleUpdateData,
   toDemandDto,
   updateScheduleSchema,
 } from "@/lib/server/demands"
-import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 type RouteParams = {
@@ -122,24 +118,24 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const reactivates =
     !isActiveDemandStatus(demand.status) && isActiveDemandStatus(effectiveStatus)
 
+  // Só avisa, não impede: o remanejamento é salvo e a resposta leva o aviso.
   // Só checa quando algo que afeta a ocupação muda; senão editar uma observação
-  // ficaria travado por um conflito que já existia antes.
+  // repetiria o aviso de um conflito que já existia antes.
+  const warnings: ApiWarning[] = []
+
   if (
     isActiveDemandStatus(effectiveStatus) &&
     (parsedDate.moved || addsPeople || reactivates)
   ) {
-    const blocking = await findBlockingScheduleConflicts(auth.user, {
+    const warning = await scheduleConflictWarning(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,
       userIds: [demand.technicianId, ...participants.map((p) => p.id)],
       excludeDemandId: demand.id,
     })
 
-    if (blocking) {
-      return jsonError(409, "CONFLICT", blocking.message, {
-        reason: SCHEDULE_CONFLICT_REASON,
-        conflitos: blocking.visible,
-      })
+    if (warning) {
+      warnings.push(warning)
     }
   }
 
@@ -225,6 +221,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         ...dto,
         dateKeys: enumerateDateKeysInAppTz(updated.inicioPrevisto, updated.fimPrevisto),
       },
-    }
+    },
+    warnings
   )
 }

@@ -25,36 +25,6 @@ type ApiFailure = {
 
 type ApiResponse<T> = ApiSuccess<T> | ApiFailure
 
-/** Erro de API que preserva `code`, `status` e `details` para quem precisa tratar o caso. */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly code?: string,
-    readonly status?: number,
-    readonly details?: unknown
-  ) {
-    super(message)
-    this.name = "ApiError"
-  }
-}
-
-/** Conflitos de agenda de um 409 de criar/remanejar; `null` para qualquer outro erro. */
-export const scheduleConflictsFromError = (
-  error: unknown
-): ScheduleConflictDto[] | null => {
-  if (!(error instanceof ApiError) || error.status !== 409) {
-    return null
-  }
-
-  const details = error.details as
-    | { reason?: string; conflitos?: ScheduleConflictDto[] }
-    | undefined
-
-  return details?.reason === "SCHEDULE_CONFLICT" && Array.isArray(details.conflitos)
-    ? details.conflitos
-    : null
-}
-
 const readCookie = (name: string) => {
   if (typeof document === "undefined") {
     return null
@@ -115,16 +85,7 @@ const request = async <T>(
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
 
   if (!response.ok || !payload || !payload.success) {
-    if (payload && !payload.success) {
-      throw new ApiError(
-        payload.error.message,
-        payload.error.code,
-        response.status,
-        payload.error.details
-      )
-    }
-
-    throw new Error("Erro inesperado de API")
+    throw new Error(payload && !payload.success ? payload.error.message : "Erro inesperado de API")
   }
 
   return {

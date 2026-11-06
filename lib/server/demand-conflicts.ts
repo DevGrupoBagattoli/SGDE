@@ -7,11 +7,11 @@ import {
   type ScheduleConflictDto,
 } from "@/lib/demands"
 import { canViewDemand } from "@/lib/server/auth"
+import type { ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 import { formatAppDateTimeRange } from "@/lib/timezone"
 
-/** Marca o 409 de agenda e o distingue do 409 de versão desatualizada. */
-export const SCHEDULE_CONFLICT_REASON = "SCHEDULE_CONFLICT"
+export const SCHEDULE_CONFLICT_CODE = "SCHEDULE_CONFLICT"
 
 export const ACTIVE_DEMAND_STATUSES: DemandStatus[] = [
   DemandStatus.PENDING,
@@ -104,14 +104,16 @@ export const conflictMessage = (conflicts: ScheduleConflictDto[]) =>
   `Este horário está ocupado por uma atividade já marcada: ${conflicts.map(describeConflict).join("; ")}.`
 
 /**
- * Usada ao criar e remanejar: o servidor recusa o salvamento quando alguém já
- * está ocupado no horário. Devolve `null` quando está livre.
+ * Usada ao criar e remanejar: o chamado é salvo normalmente e, se alguém já
+ * estava ocupado no horário, a resposta leva este aviso. `null` quando está livre.
  */
-export const findBlockingScheduleConflicts = async (
+export const scheduleConflictWarning = async (
   viewer: User,
   query: ConflictQuery
-): Promise<{ visible: ScheduleConflictDto[]; message: string } | null> => {
+): Promise<ApiWarning | null> => {
   const { conflicts, visible } = await detectScheduleConflicts(viewer, query)
 
-  return conflicts.length === 0 ? null : { visible, message: conflictMessage(visible) }
+  return conflicts.length === 0
+    ? null
+    : { code: SCHEDULE_CONFLICT_CODE, message: conflictMessage(visible) }
 }

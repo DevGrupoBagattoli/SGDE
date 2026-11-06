@@ -59,7 +59,6 @@ import {
   apiUpdateDescricao,
   apiUpdateSchedule,
   apiUpdateStatus,
-  scheduleConflictsFromError,
 } from "@/lib/api"
 import {
   Demand,
@@ -67,7 +66,6 @@ import {
   matchesTechnicianDashboardFilter,
   parseDurationDisplayMinutes,
   sameParticipants,
-  ScheduleConflictDto,
   statusLabels,
   type SummaryDetailSegment,
   validateDemandDescricao,
@@ -284,7 +282,7 @@ export function DemandsDashboard() {
 
   const handleCreateDemand = async (
     newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">
-  ): Promise<ScheduleConflictDto[] | void> => {
+  ) => {
     if (isSaving) return
     setGlobalError("")
     setRequestWarning("")
@@ -309,12 +307,6 @@ export function DemandsDashboard() {
 
       setIsCreateModalOpen(false)
     } catch (error) {
-      // Agenda ocupada: o modal segue aberto mostrando quem está ocupado.
-      const conflicts = scheduleConflictsFromError(error)
-      if (conflicts) {
-        return conflicts
-      }
-
       setGlobalError(
         error instanceof Error ? error.message : "Falha ao criar demanda"
       )
@@ -406,7 +398,7 @@ export function DemandsDashboard() {
     participantes: string[],
     duracaoPrevista: string,
     nextStatus: DemandStatus
-  ): Promise<ScheduleConflictDto[] | void> => {
+  ) => {
     event.preventDefault()
 
     if (!editingDemand || isSaving) {
@@ -536,12 +528,6 @@ export function DemandsDashboard() {
 
       setEditingDemand(null)
     } catch (error) {
-      // Agenda ocupada: mantém o que a pessoa digitou e mostra o problema no próprio modal.
-      const conflicts = scheduleConflictsFromError(error)
-      if (conflicts) {
-        return conflicts
-      }
-
       const baseMessage =
         error instanceof Error ? error.message : "Falha ao atualizar demanda"
       const savedParts = [

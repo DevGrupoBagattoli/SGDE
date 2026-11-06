@@ -12,7 +12,6 @@ import {
   Demand,
   DemandStatus,
   formatDuracaoFromParts,
-  ScheduleConflictDto,
   statusOptions,
 } from "@/lib/demands"
 
@@ -24,10 +23,7 @@ type CreateDemandModalProps = {
   session: UserSession
   technicians: string[]
   onClose: () => void
-  /** Devolve os conflitos quando o servidor recusa por agenda ocupada (o modal fica aberto). */
-  onCreate: (
-    demand: CreateDemandInput
-  ) => Promise<ScheduleConflictDto[] | void> | ScheduleConflictDto[] | void
+  onCreate: (demand: CreateDemandInput) => Promise<void> | void
 }
 
 const clamp = (n: number, min: number, max: number) =>
@@ -71,38 +67,18 @@ export function CreateDemandModal({
     }
   }, [horarioInicio])
 
-  // Chamado concluído ou cancelado não ocupa ninguém: não há o que avisar.
-  const { conflicts: precheckConflicts } = useScheduleConflicts({
+  // Só avisa, não impede de salvar. Concluído ou cancelado não ocupa ninguém.
+  const { conflicts } = useScheduleConflicts({
     enabled: status === "Pendente" || status === "Em Andamento",
     inicio: inicioIso,
     duracao: duracaoPreview,
     usuarios: tecnico ? [tecnico] : [],
   })
 
-  // Conflito devolvido pelo servidor no salvamento; vale só enquanto os dados não mudam.
-  const signature = [tecnico, inicioIso, duracaoPreview, status].join("|")
-  const [saveConflicts, setSaveConflicts] = useState<{
-    signature: string
-    conflicts: ScheduleConflictDto[]
-  } | null>(null)
-
-  const saveBlocked = saveConflicts?.signature === signature
-  const conflicts =
-    precheckConflicts.length > 0
-      ? precheckConflicts
-      : saveBlocked
-        ? saveConflicts.conflicts
-        : []
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (precheckConflicts.length > 0) {
-      setSaveConflicts({ signature, conflicts: precheckConflicts })
-      return
-    }
-
-    const refused = await onCreate({
+    onCreate({
       tecnico,
       equipe: "Sem equipe",
       local: local.trim(),
@@ -113,10 +89,6 @@ export function CreateDemandModal({
       observacoes: observacoes.trim(),
       participantes: [],
     })
-
-    if (refused && refused.length > 0) {
-      setSaveConflicts({ signature, conflicts: refused })
-    }
   }
 
   return (
@@ -284,7 +256,7 @@ export function CreateDemandModal({
 
         {conflicts.length > 0 ? (
           <div className="mt-4">
-            <ScheduleConflictAlert conflicts={conflicts} saveBlocked={saveBlocked} />
+            <ScheduleConflictAlert conflicts={conflicts} />
           </div>
         ) : null}
 

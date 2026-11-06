@@ -12,7 +12,6 @@ import {
   DemandStatus,
   formatDuracaoFromParts,
   parseDuracaoParts,
-  ScheduleConflictDto,
   statusOptions,
 } from "@/lib/demands"
 
@@ -30,13 +29,12 @@ type ScheduleEditModalProps = {
   onDescricaoChange?: (value: string) => void
   onObservationChange: (value: string) => void
   onScheduleChange: (value: string) => void
-  /** Devolve os conflitos quando o servidor recusa por agenda ocupada (o modal fica aberto). */
   onSubmit: (
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string,
     status: DemandStatus
-  ) => Promise<ScheduleConflictDto[] | void> | ScheduleConflictDto[] | void
+  ) => Promise<void> | void
 }
 
 const isActiveStatus = (status: DemandStatus) =>
@@ -95,7 +93,8 @@ function ScheduleEditModalForm({
   const addsPeople = participantes.some((name) => !demand.participantes.includes(name))
   const reactivates = !isActiveStatus(demand.status) && isActiveStatus(statusValue)
 
-  const { conflicts: precheckConflicts } = useScheduleConflicts({
+  // Só avisa, não impede de salvar.
+  const { conflicts } = useScheduleConflicts({
     enabled:
       isActiveStatus(statusValue) &&
       (startChanged || durationChanged || addsPeople || reactivates),
@@ -104,36 +103,6 @@ function ScheduleEditModalForm({
     usuarios: [demand.tecnico, ...participantes],
     excluir: demand.id,
   })
-
-  // Conflito devolvido pelo servidor no salvamento; vale só enquanto os dados não mudam.
-  const signature = [scheduleValue, duracaoPreview, participantes.join(","), statusValue].join("|")
-  const [saveConflicts, setSaveConflicts] = useState<{
-    signature: string
-    conflicts: ScheduleConflictDto[]
-  } | null>(null)
-
-  const saveBlocked = saveConflicts?.signature === signature
-  const conflicts =
-    precheckConflicts.length > 0
-      ? precheckConflicts
-      : saveBlocked
-        ? saveConflicts.conflicts
-        : []
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    // Reativar só pelo status não passa pela rota de agenda: a tela barra aqui.
-    if (precheckConflicts.length > 0) {
-      event.preventDefault()
-      setSaveConflicts({ signature, conflicts: precheckConflicts })
-      return
-    }
-
-    const refused = await onSubmit(event, participantes, duracaoPreview, statusValue)
-
-    if (refused && refused.length > 0) {
-      setSaveConflicts({ signature, conflicts: refused })
-    }
-  }
 
   const available = allTechnicians.filter(
     (t) => t !== demand.tecnico && !participantes.includes(t)
@@ -158,7 +127,9 @@ function ScheduleEditModalForm({
     >
       <form
         className="max-h-[90svh] w-full max-w-lg overflow-x-hidden overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
-        onSubmit={handleSubmit}
+        onSubmit={(e) =>
+          onSubmit(e, participantes, duracaoPreview, statusValue)
+        }
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -291,7 +262,7 @@ function ScheduleEditModalForm({
           </label>
 
           {conflicts.length > 0 ? (
-            <ScheduleConflictAlert conflicts={conflicts} saveBlocked={saveBlocked} />
+            <ScheduleConflictAlert conflicts={conflicts} />
           ) : null}
 
           {error ? (
