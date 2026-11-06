@@ -265,7 +265,7 @@ export function CreateDemandModal({
             Cancelar
           </Button>
           <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Criando…" : "Criar chamado"}
+            {isSaving ? "Criando…" : conflicts.length > 0 ? "Criar mesmo assim" : "Criar chamado"}
           </Button>
         </div>
       </form>
