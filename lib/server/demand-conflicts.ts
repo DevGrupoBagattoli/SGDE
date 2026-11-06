@@ -4,10 +4,11 @@ import {
   findScheduleConflicts,
   type ConflictCandidate,
   type ScheduleConflict,
+  type ScheduleConflictDto,
 } from "@/lib/demands"
 import { canViewDemand } from "@/lib/server/auth"
 import { prisma } from "@/lib/server/prisma"
-import { appTimeFormatter, dateKeyInAppTz, formatAppDateTime } from "@/lib/timezone"
+import { formatAppDateTimeRange } from "@/lib/timezone"
 
 /** Marca o 409 de agenda e o distingue do 409 de versão desatualizada. */
 export const SCHEDULE_CONFLICT_REASON = "SCHEDULE_CONFLICT"
@@ -19,20 +20,6 @@ export const ACTIVE_DEMAND_STATUSES: DemandStatus[] = [
 
 export const isActiveDemandStatus = (status: DemandStatus) =>
   ACTIVE_DEMAND_STATUSES.includes(status)
-
-/**
- * Conflito como o cliente recebe. Quando quem consulta não pode ver o chamado
- * que causa o conflito, só o nome da pessoa ocupada segue (`restrito: true`).
- */
-export type ScheduleConflictDto = {
-  userId: string
-  userName: string
-  demandId: string | null
-  local: string | null
-  inicio: string | null
-  fim: string | null
-  restrito: boolean
-}
 
 type ConflictQuery = {
   start: Date
@@ -108,16 +95,10 @@ export const detectScheduleConflicts = async (
   return { conflicts, visible }
 }
 
-/** "11/05/2026 10:00 – 12:00", ou com as duas datas quando cruza a meia-noite. */
-const formatRange = (start: Date, end: Date) =>
-  dateKeyInAppTz(start) === dateKeyInAppTz(end)
-    ? `${formatAppDateTime(start)} – ${appTimeFormatter.format(end)}`
-    : `${formatAppDateTime(start)} – ${formatAppDateTime(end)}`
-
 const describeConflict = (conflict: ScheduleConflictDto) =>
   conflict.restrito || !conflict.inicio || !conflict.fim
     ? `${conflict.userName} (ocupado(a) em outro chamado)`
-    : `${conflict.userName} em ${conflict.local} (${formatRange(new Date(conflict.inicio), new Date(conflict.fim))})`
+    : `${conflict.userName} em ${conflict.local} (${formatAppDateTimeRange(new Date(conflict.inicio), new Date(conflict.fim))})`
 
 export const conflictMessage = (conflicts: ScheduleConflictDto[]) =>
   `Este horário está ocupado por uma atividade já marcada: ${conflicts.map(describeConflict).join("; ")}.`
@@ -127,7 +108,7 @@ export const conflictAuditSummary = (conflicts: ScheduleConflict[]) =>
   conflicts
     .map(
       (conflict) =>
-        `${conflict.userName} em ${conflict.local} (${formatRange(conflict.inicio, conflict.fim)}, chamado ${conflict.demandId})`
+        `${conflict.userName} em ${conflict.local} (${formatAppDateTimeRange(conflict.inicio, conflict.fim)}, chamado ${conflict.demandId})`
     )
     .join("; ")
 

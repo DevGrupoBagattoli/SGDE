@@ -7,6 +7,7 @@ import {
   endOfDayInAppTz,
   enumerateDateKeysInAppTz,
   formatAppDateTime,
+  formatAppDateTimeRange,
   startOfDayInAppTz,
   todayCalendarDateInAppTz,
   zonedWallTimeToDate,
@@ -21,6 +22,16 @@ describe("fuso da empresa", () => {
   it("formata horário no fuso da empresa, independente do fuso do processo", () => {
     expect(appTimeFormatter.format(new Date("2026-11-04T12:00:00.000Z"))).toBe("08:00")
     expect(formatAppDateTime(new Date("2026-11-04T12:00:00.000Z"))).toBe("04/11/2026 08:00")
+  })
+
+  it("formata intervalo no fuso da empresa, com uma ou duas datas", () => {
+    expect(
+      formatAppDateTimeRange(new Date("2026-05-11T14:00:00.000Z"), new Date("2026-05-11T16:00:00.000Z"))
+    ).toBe("11/05/2026 10:00 – 12:00")
+    // 23:00 local de um dia até 01:00 do seguinte
+    expect(
+      formatAppDateTimeRange(new Date("2026-05-12T03:00:00.000Z"), new Date("2026-05-12T05:00:00.000Z"))
+    ).toBe("11/05/2026 23:00 – 12/05/2026 01:00")
   })
 
   it("converte data/hora de parede em instante", () => {

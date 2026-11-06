@@ -1,5 +1,5 @@
 import { UserSession } from "@/lib/auth"
-import { Demand, DemandStatus } from "@/lib/demands"
+import { Demand, DemandStatus, type ScheduleConflictDto } from "@/lib/demands"
 import type { NotificationEventType } from "@/lib/notifications/types"
 import type {
   ReportAuditRow,
@@ -24,6 +24,36 @@ type ApiFailure = {
 }
 
 type ApiResponse<T> = ApiSuccess<T> | ApiFailure
+
+/** Erro de API que preserva `code`, `status` e `details` para quem precisa tratar o caso. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly status?: number,
+    readonly details?: unknown
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
+/** Conflitos de agenda de um 409 de criar/remanejar; `null` para qualquer outro erro. */
+export const scheduleConflictsFromError = (
+  error: unknown
+): ScheduleConflictDto[] | null => {
+  if (!(error instanceof ApiError) || error.status !== 409) {
+    return null
+  }
+
+  const details = error.details as
+    | { reason?: string; conflitos?: ScheduleConflictDto[] }
+    | undefined
+
+  return details?.reason === "SCHEDULE_CONFLICT" && Array.isArray(details.conflitos)
+    ? details.conflitos
+    : null
+}
 
 const readCookie = (name: string) => {
   if (typeof document === "undefined") {
@@ -85,7 +115,16 @@ const request = async <T>(
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
 
   if (!response.ok || !payload || !payload.success) {
-    throw new Error(payload && !payload.success ? payload.error.message : "Erro inesperado de API")
+    if (payload && !payload.success) {
+      throw new ApiError(
+        payload.error.message,
+        payload.error.code,
+        response.status,
+        payload.error.details
+      )
+    }
+
+    throw new Error("Erro inesperado de API")
   }
 
   return {
@@ -132,7 +171,11 @@ export const apiGetDemands = async () => {
   return result.data.demands
 }
 
-export const apiCreateDemand = async (payload: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">) => {
+export const apiCreateDemand = async (
+  payload: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim"> & {
+    confirmarConflito?: boolean
+  }
+) => {
   const result = await request<{ demand: Demand }>("/api/demands", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -167,6 +210,9 @@ export const apiUpdateSchedule = async (
     observacoes: string
     participantes: string[]
     version: number
+    /** Status que o chamado terá ao salvar; o servidor só usa para decidir se checa a agenda. */
+    status?: DemandStatus
+    confirmarConflito?: boolean
   }
 ) => {
   const result = await request<{ demand: Demand }>(`/api/demands/${id}/schedule`, {
@@ -175,6 +221,24 @@ export const apiUpdateSchedule = async (
   })
 
   return result
+}
+
+/** Aviso antecipado: quem já está ocupado em [inicio, inicio + duracao). */
+export const apiGetConflicts = async (params: {
+  inicio: string
+  duracao: string
+  usuarios: string[]
+  excluir?: string
+}) => {
+  const query = new URLSearchParams({ inicio: params.inicio, duracao: params.duracao })
+  params.usuarios.forEach((name) => query.append("usuarios", name))
+  if (params.excluir) query.set("excluir", params.excluir)
+
+  const result = await request<{ conflitos: ScheduleConflictDto[] }>(
+    `/api/demands/conflicts?${query.toString()}`
+  )
+
+  return result.data.conflitos
 }
 
 export type UserDto = {

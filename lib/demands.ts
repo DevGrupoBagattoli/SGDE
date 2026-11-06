@@ -134,6 +134,20 @@ export type ScheduleConflict = {
 }
 
 /**
+ * Conflito como a API entrega ao cliente. Quando quem consulta não pode ver o
+ * chamado que causa o conflito, só o nome da pessoa ocupada segue (`restrito`).
+ */
+export type ScheduleConflictDto = {
+  userId: string
+  userName: string
+  demandId: string | null
+  local: string | null
+  inicio: string | null
+  fim: string | null
+  restrito: boolean
+}
+
+/**
  * Quem em `userIds` já está ocupado em [start, end) por outro chamado.
  *
  * Intervalos semiabertos: terminar às 10:00 e começar às 10:00 não conflita.
