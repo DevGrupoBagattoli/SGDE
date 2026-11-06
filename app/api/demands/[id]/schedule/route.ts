@@ -5,8 +5,8 @@ import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import {
+  findBlockingScheduleConflicts,
   isActiveDemandStatus,
-  resolveScheduleConflicts,
   SCHEDULE_CONFLICT_REASON,
 } from "@/lib/server/demand-conflicts"
 import {
@@ -123,30 +123,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     !isActiveDemandStatus(demand.status) && isActiveDemandStatus(effectiveStatus)
 
   // Só checa quando algo que afeta a ocupação muda; senão editar uma observação
-  // exigiria confirmar de novo um conflito que já existia.
-  let conflictAuditSummary: string | null = null
-
+  // ficaria travado por um conflito que já existia antes.
   if (
     isActiveDemandStatus(effectiveStatus) &&
     (parsedDate.moved || addsPeople || reactivates)
   ) {
-    const resolution = await resolveScheduleConflicts(auth.user, {
+    const blocking = await findBlockingScheduleConflicts(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,
       userIds: [demand.technicianId, ...participants.map((p) => p.id)],
       excludeDemandId: demand.id,
-      confirmar: parsed.data.confirmarConflito,
     })
 
-    if (resolution.status === "needs-confirmation") {
-      return jsonError(409, "CONFLICT", resolution.message, {
+    if (blocking) {
+      return jsonError(409, "CONFLICT", blocking.message, {
         reason: SCHEDULE_CONFLICT_REASON,
-        conflitos: resolution.visible,
+        conflitos: blocking.visible,
       })
-    }
-
-    if (resolution.status === "confirmed") {
-      conflictAuditSummary = resolution.auditSummary
     }
   }
 
@@ -211,19 +204,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           nextValue: participants.map((p) => p.name).join(", "),
           reason: parsed.data.observacoes.trim() || null,
         },
-        ...(conflictAuditSummary
-          ? [
-              {
-                demandId: demand.id,
-                actorUserId: auth.user.id,
-                action: "CONFIRM_CONFLICT",
-                field: "conflito",
-                previousValue: null,
-                nextValue: conflictAuditSummary,
-                reason: parsed.data.observacoes.trim() || null,
-              },
-            ]
-          : []),
       ],
     })
 

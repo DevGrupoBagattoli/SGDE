@@ -103,38 +103,15 @@ const describeConflict = (conflict: ScheduleConflictDto) =>
 export const conflictMessage = (conflicts: ScheduleConflictDto[]) =>
   `Este horário está ocupado por uma atividade já marcada: ${conflicts.map(describeConflict).join("; ")}.`
 
-/** Resumo gravado na auditoria; sai sempre do cálculo do servidor, com todos os detalhes. */
-export const conflictAuditSummary = (conflicts: ScheduleConflict[]) =>
-  conflicts
-    .map(
-      (conflict) =>
-        `${conflict.userName} em ${conflict.local} (${formatAppDateTimeRange(conflict.inicio, conflict.fim)}, chamado ${conflict.demandId})`
-    )
-    .join("; ")
-
-export type ConflictResolution =
-  | { status: "free" }
-  | { status: "needs-confirmation"; visible: ScheduleConflictDto[]; message: string }
-  | { status: "confirmed"; auditSummary: string }
-
 /**
- * Decisão única para criar e remanejar. O servidor sempre recalcula: a flag
- * `confirmar` só importa quando há conflito de fato, e o resumo auditado vem
- * daqui, nunca do cliente.
+ * Usada ao criar e remanejar: o servidor recusa o salvamento quando alguém já
+ * está ocupado no horário. Devolve `null` quando está livre.
  */
-export const resolveScheduleConflicts = async (
+export const findBlockingScheduleConflicts = async (
   viewer: User,
-  query: ConflictQuery & { confirmar: boolean }
-): Promise<ConflictResolution> => {
+  query: ConflictQuery
+): Promise<{ visible: ScheduleConflictDto[]; message: string } | null> => {
   const { conflicts, visible } = await detectScheduleConflicts(viewer, query)
 
-  if (conflicts.length === 0) {
-    return { status: "free" }
-  }
-
-  if (!query.confirmar) {
-    return { status: "needs-confirmation", visible, message: conflictMessage(visible) }
-  }
-
-  return { status: "confirmed", auditSummary: conflictAuditSummary(conflicts) }
+  return conflicts.length === 0 ? null : { visible, message: conflictMessage(visible) }
 }

@@ -14,7 +14,6 @@ describe("parseCreateDemandData (agendamento)", () => {
       status: "Pendente",
       observacoes: "",
       participantes: [],
-      confirmarConflito: false,
     })
 
     expect(parsed.durationMinutes).toBe(90)
@@ -34,7 +33,6 @@ describe("parseCreateDemandData (agendamento)", () => {
         status: "Pendente",
         observacoes: "",
         participantes: [],
-      confirmarConflito: false,
       })
     ).toThrow("Intervalo inválido")
   })

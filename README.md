@@ -246,7 +246,7 @@ Eletricista:
 - suporte a multi-dia (a mesma demanda aparece em todos os dias cobertos)
 - remanejamento exige observacao
 - conflito de agenda e checado por pessoa (tecnico + participantes) em chamados PENDING e IN_PROGRESS; intervalos sao semiabertos (terminar as 10:00 e comecar as 10:00 nao conflita)
-- ao criar ou remanejar com conflito, a API responde 409 (CONFLICT, details.reason = SCHEDULE_CONFLICT) e so salva com confirmarConflito: true, gravando auditoria CONFIRM_CONFLICT
+- ao criar ou remanejar com conflito, a API recusa o salvamento com 409 (CONFLICT, details.reason = SCHEDULE_CONFLICT) e lista quem esta ocupado; nao ha confirmacao para forcar
 - GET /api/demands/conflicts?inicio&duracao&usuarios&excluir antecipa o aviso para os formularios
 - concorrencia otimista por version
 - auditoria para criacao, status e agenda

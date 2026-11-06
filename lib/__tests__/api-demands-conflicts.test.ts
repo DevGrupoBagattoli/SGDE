@@ -97,13 +97,6 @@ const createdDemand = () => ({
   participants: [],
 })
 
-const auditsOfCreate = () => {
-  const call = db.demand.create.mock.calls[0][0] as {
-    data: { audits: { create: Array<Record<string, unknown>> } }
-  }
-  return call.data.audits.create
-}
-
 beforeEach(() => {
   jest.resetAllMocks()
   validateCsrfMock.mockResolvedValue(null)
@@ -119,10 +112,10 @@ describe("POST /api/demands - conflito de agenda", () => {
     const response = await post({})
 
     expect(response.status).toBe(200)
-    expect(auditsOfCreate().map((a) => a.action)).toEqual(["CREATE"])
+    expect(db.demand.create).toHaveBeenCalledTimes(1)
   })
 
-  it("retorna 409 com os conflitos e não salva sem confirmação", async () => {
+  it("retorna 409 com os conflitos e não salva", async () => {
     db.demand.findMany.mockResolvedValue([existing()])
 
     const response = await post({})
@@ -149,30 +142,13 @@ describe("POST /api/demands - conflito de agenda", () => {
     expect(db.demand.create).not.toHaveBeenCalled()
   })
 
-  it("salva e audita quando o gestor confirma o conflito", async () => {
+  it("não deixa forçar o salvamento mandando confirmarConflito", async () => {
     db.demand.findMany.mockResolvedValue([existing()])
 
     const response = await post({ confirmarConflito: true })
 
-    expect(response.status).toBe(200)
-    const audits = auditsOfCreate()
-    expect(audits.map((a) => a.action)).toEqual(["CREATE", "CONFIRM_CONFLICT"])
-    expect(audits[1]).toMatchObject({
-      actorUserId: GESTOR.id,
-      field: "conflito",
-      previousValue: null,
-    })
-    // o resumo vem do cálculo do servidor, com chamado e local
-    expect(audits[1].nextValue).toContain("João Silva")
-    expect(audits[1].nextValue).toContain("Bloco B")
-    expect(audits[1].nextValue).toContain("d-outro")
-  })
-
-  it("ignora a confirmação e não audita quando não há conflito", async () => {
-    const response = await post({ confirmarConflito: true })
-
-    expect(response.status).toBe(200)
-    expect(auditsOfCreate().map((a) => a.action)).toEqual(["CREATE"])
+    expect(response.status).toBe(409)
+    expect(db.demand.create).not.toHaveBeenCalled()
   })
 
   it("acusa conflito só do participante", async () => {
@@ -257,13 +233,6 @@ const tx = {
   demandAudit: { createMany: jest.fn() as Mock },
 }
 
-const auditsOfSchedule = () => {
-  const call = tx.demandAudit.createMany.mock.calls[0][0] as {
-    data: Array<Record<string, unknown>>
-  }
-  return call.data
-}
-
 describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
   beforeEach(() => {
     db.demand.findUnique.mockResolvedValue(ownDemand())
@@ -283,7 +252,7 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     const response = await patchSchedule({})
 
     expect(response.status).toBe(200)
-    expect(auditsOfSchedule().map((a) => a.action)).not.toContain("CONFIRM_CONFLICT")
+    expect(db.$transaction).toHaveBeenCalledTimes(1)
   })
 
   it("não conflita com o próprio chamado", async () => {
@@ -301,7 +270,7 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     )
   })
 
-  it("retorna 409 com os conflitos e não salva sem confirmação", async () => {
+  it("retorna 409 com os conflitos e não salva", async () => {
     db.demand.findMany.mockResolvedValue([existing()])
 
     const response = await patchSchedule({})
@@ -316,26 +285,13 @@ describe("PATCH /api/demands/[id]/schedule - conflito de agenda", () => {
     expect(db.$transaction).not.toHaveBeenCalled()
   })
 
-  it("salva e audita quando o gestor confirma", async () => {
+  it("não deixa forçar o salvamento mandando confirmarConflito", async () => {
     db.demand.findMany.mockResolvedValue([existing()])
 
     const response = await patchSchedule({ confirmarConflito: true })
 
-    expect(response.status).toBe(200)
-    const confirmation = auditsOfSchedule().find((a) => a.action === "CONFIRM_CONFLICT")
-    expect(confirmation).toMatchObject({
-      demandId: "d-1",
-      actorUserId: GESTOR.id,
-      field: "conflito",
-    })
-    expect(confirmation?.nextValue).toContain("Bloco B")
-  })
-
-  it("ignora a confirmação e não audita quando não há conflito", async () => {
-    const response = await patchSchedule({ confirmarConflito: true })
-
-    expect(response.status).toBe(200)
-    expect(auditsOfSchedule().map((a) => a.action)).not.toContain("CONFIRM_CONFLICT")
+    expect(response.status).toBe(409)
+    expect(db.$transaction).not.toHaveBeenCalled()
   })
 
   it("checa os participantes que ficam depois da edição", async () => {

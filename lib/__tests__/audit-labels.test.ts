@@ -17,15 +17,11 @@ describe("audit-labels", () => {
     expect(formatAuditAction("UPDATE_STATUS")).toBe("Alteração de status")
     expect(formatAuditAction("CREATE")).toBe("Criação")
     expect(formatAuditAction("DELETE")).toBe("Exclusão")
-    expect(formatAuditAction("CONFIRM_CONFLICT")).toBe(
-      "Confirmação de conflito de agenda"
-    )
   })
 
   it("traduz campos alterados", () => {
     expect(formatAuditField("inicioPrevisto")).toBe("Início previsto")
     expect(formatAuditField("participantes")).toBe("Participantes")
-    expect(formatAuditField("conflito")).toBe("Conflito de agenda")
   })
 
   it("traduz status Prisma em valores De/para", () => {

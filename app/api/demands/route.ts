@@ -6,8 +6,8 @@ import { canViewDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
 import {
+  findBlockingScheduleConflicts,
   isActiveDemandStatus,
-  resolveScheduleConflicts,
   SCHEDULE_CONFLICT_REASON,
 } from "@/lib/server/demand-conflicts"
 import {
@@ -188,25 +188,18 @@ export async function POST(request: Request) {
   }
 
   // Chamado já nascido como concluído/cancelado não ocupa ninguém.
-  let conflictAuditSummary: string | null = null
-
   if (isActiveDemandStatus(parsedDate.dbStatus)) {
-    const resolution = await resolveScheduleConflicts(auth.user, {
+    const blocking = await findBlockingScheduleConflicts(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,
       userIds: [technician.id, ...participants.map((participant) => participant.id)],
-      confirmar: parsed.data.confirmarConflito,
     })
 
-    if (resolution.status === "needs-confirmation") {
-      return jsonError(409, "CONFLICT", resolution.message, {
+    if (blocking) {
+      return jsonError(409, "CONFLICT", blocking.message, {
         reason: SCHEDULE_CONFLICT_REASON,
-        conflitos: resolution.visible,
+        conflitos: blocking.visible,
       })
-    }
-
-    if (resolution.status === "confirmed") {
-      conflictAuditSummary = resolution.auditSummary
     }
   }
 
@@ -228,28 +221,14 @@ export async function POST(request: Request) {
         })),
       },
       audits: {
-        create: [
-          {
-            actorUserId: auth.user.id,
-            action: "CREATE",
-            field: "*",
-            previousValue: null,
-            nextValue: "Demanda criada",
-            reason: parsed.data.observacoes || null,
-          },
-          ...(conflictAuditSummary
-            ? [
-                {
-                  actorUserId: auth.user.id,
-                  action: "CONFIRM_CONFLICT",
-                  field: "conflito",
-                  previousValue: null,
-                  nextValue: conflictAuditSummary,
-                  reason: parsed.data.observacoes || null,
-                },
-              ]
-            : []),
-        ],
+        create: {
+          actorUserId: auth.user.id,
+          action: "CREATE",
+          field: "*",
+          previousValue: null,
+          nextValue: "Demanda criada",
+          reason: parsed.data.observacoes || null,
+        },
       },
     },
     include: {
