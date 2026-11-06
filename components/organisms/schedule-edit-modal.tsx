@@ -35,8 +35,7 @@ type ScheduleEditModalProps = {
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string,
-    status: DemandStatus,
-    confirmarConflito: boolean
+    status: DemandStatus
   ) => Promise<ScheduleConflictDto[] | void> | ScheduleConflictDto[] | void
 }
 
@@ -113,22 +112,16 @@ function ScheduleEditModalForm({
     conflicts: ScheduleConflictDto[]
   } | null>(null)
 
+  const saveBlocked = saveConflicts?.signature === signature
   const conflicts =
     precheckConflicts.length > 0
       ? precheckConflicts
-      : saveConflicts?.signature === signature
+      : saveBlocked
         ? saveConflicts.conflicts
         : []
-  const hasConflicts = conflicts.length > 0
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    const refused = await onSubmit(
-      event,
-      participantes,
-      duracaoPreview,
-      statusValue,
-      hasConflicts
-    )
+    const refused = await onSubmit(event, participantes, duracaoPreview, statusValue)
 
     if (refused && refused.length > 0) {
       setSaveConflicts({ signature, conflicts: refused })
@@ -290,7 +283,9 @@ function ScheduleEditModalForm({
             />
           </label>
 
-          {hasConflicts ? <ScheduleConflictAlert conflicts={conflicts} /> : null}
+          {conflicts.length > 0 ? (
+            <ScheduleConflictAlert conflicts={conflicts} saveBlocked={saveBlocked} />
+          ) : null}
 
           {error ? (
             <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -362,12 +357,8 @@ function ScheduleEditModalForm({
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button
-            className={hasConflicts ? "bg-amber-600 text-white hover:bg-amber-700" : undefined}
-            type="submit"
-            disabled={isSaving}
-          >
-            {isSaving ? "Salvando…" : hasConflicts ? "Salvar mesmo assim" : "Salvar alteração"}
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? "Salvando…" : "Salvar alteração"}
           </Button>
         </div>
       </form>

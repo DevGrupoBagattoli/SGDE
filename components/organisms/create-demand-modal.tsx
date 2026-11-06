@@ -26,8 +26,7 @@ type CreateDemandModalProps = {
   onClose: () => void
   /** Devolve os conflitos quando o servidor recusa por agenda ocupada (o modal fica aberto). */
   onCreate: (
-    demand: CreateDemandInput,
-    confirmarConflito: boolean
+    demand: CreateDemandInput
   ) => Promise<ScheduleConflictDto[] | void> | ScheduleConflictDto[] | void
 }
 
@@ -87,31 +86,28 @@ export function CreateDemandModal({
     conflicts: ScheduleConflictDto[]
   } | null>(null)
 
+  const saveBlocked = saveConflicts?.signature === signature
   const conflicts =
     precheckConflicts.length > 0
       ? precheckConflicts
-      : saveConflicts?.signature === signature
+      : saveBlocked
         ? saveConflicts.conflicts
         : []
-  const hasConflicts = conflicts.length > 0
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    const refused = await onCreate(
-      {
-        tecnico,
-        equipe: "Sem equipe",
-        local: local.trim(),
-        descricao: descricao.trim(),
-        horarioInicio: fromDateTimeLocalValue(horarioInicio),
-        duracaoPrevista: duracaoPreview,
-        status,
-        observacoes: observacoes.trim(),
-        participantes: [],
-      },
-      hasConflicts
-    )
+    const refused = await onCreate({
+      tecnico,
+      equipe: "Sem equipe",
+      local: local.trim(),
+      descricao: descricao.trim(),
+      horarioInicio: fromDateTimeLocalValue(horarioInicio),
+      duracaoPrevista: duracaoPreview,
+      status,
+      observacoes: observacoes.trim(),
+      participantes: [],
+    })
 
     if (refused && refused.length > 0) {
       setSaveConflicts({ signature, conflicts: refused })
@@ -281,9 +277,9 @@ export function CreateDemandModal({
           </label>
         </div>
 
-        {hasConflicts ? (
+        {conflicts.length > 0 ? (
           <div className="mt-4">
-            <ScheduleConflictAlert conflicts={conflicts} />
+            <ScheduleConflictAlert conflicts={conflicts} saveBlocked={saveBlocked} />
           </div>
         ) : null}
 
@@ -291,12 +287,8 @@ export function CreateDemandModal({
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button
-            className={hasConflicts ? "bg-amber-600 text-white hover:bg-amber-700" : undefined}
-            type="submit"
-            disabled={isSaving}
-          >
-            {isSaving ? "Criando…" : hasConflicts ? "Salvar mesmo assim" : "Criar chamado"}
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? "Criando…" : "Criar chamado"}
           </Button>
         </div>
       </form>

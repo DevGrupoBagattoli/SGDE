@@ -5,16 +5,18 @@ import { formatAppDateTimeRange } from "@/lib/timezone"
 
 type ScheduleConflictAlertProps = {
   conflicts: ScheduleConflictDto[]
+  /** A pessoa tentou salvar e o servidor recusou por causa do horário. */
+  saveBlocked?: boolean
 }
 
-export function ScheduleConflictAlert({ conflicts }: ScheduleConflictAlertProps) {
+export function ScheduleConflictAlert({ conflicts, saveBlocked = false }: ScheduleConflictAlertProps) {
   if (conflicts.length === 0) {
     return null
   }
 
   return (
     <div
-      className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
       role="alert"
     >
       <p className="flex items-center gap-2 font-semibold">
@@ -36,9 +38,9 @@ export function ScheduleConflictAlert({ conflicts }: ScheduleConflictAlertProps)
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-amber-800">
-        Horários no fuso de Vilhena/RO. Você pode salvar mesmo assim.
-      </p>
+      {saveBlocked ? (
+        <p className="mt-2 font-semibold">Não foi possível salvar. Escolha outro horário.</p>
+      ) : null}
     </div>
   )
 }

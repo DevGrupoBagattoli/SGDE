@@ -171,11 +171,7 @@ export const apiGetDemands = async () => {
   return result.data.demands
 }
 
-export const apiCreateDemand = async (
-  payload: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim"> & {
-    confirmarConflito?: boolean
-  }
-) => {
+export const apiCreateDemand = async (payload: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">) => {
   const result = await request<{ demand: Demand }>("/api/demands", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -212,7 +208,6 @@ export const apiUpdateSchedule = async (
     version: number
     /** Status que o chamado terá ao salvar; o servidor só usa para decidir se checa a agenda. */
     status?: DemandStatus
-    confirmarConflito?: boolean
   }
 ) => {
   const result = await request<{ demand: Demand }>(`/api/demands/${id}/schedule`, {

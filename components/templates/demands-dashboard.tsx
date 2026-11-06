@@ -283,8 +283,7 @@ export function DemandsDashboard() {
   }
 
   const handleCreateDemand = async (
-    newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">,
-    confirmarConflito: boolean
+    newDemand: Omit<Demand, "id" | "version" | "dateKeys" | "horarioFim">
   ): Promise<ScheduleConflictDto[] | void> => {
     if (isSaving) return
     setGlobalError("")
@@ -292,7 +291,7 @@ export function DemandsDashboard() {
     setIsSaving(true)
 
     try {
-      const response = await apiCreateDemand({ ...newDemand, confirmarConflito })
+      const response = await apiCreateDemand(newDemand)
       const createdDemand = response.data.demand
       const createdAt = calendarDateOfInstant(new Date(createdDemand.horarioInicio))
 
@@ -310,7 +309,7 @@ export function DemandsDashboard() {
 
       setIsCreateModalOpen(false)
     } catch (error) {
-      // Agenda ocupada: o modal segue aberto mostrando o aviso e "Salvar mesmo assim".
+      // Agenda ocupada: o modal segue aberto mostrando quem está ocupado.
       const conflicts = scheduleConflictsFromError(error)
       if (conflicts) {
         return conflicts
@@ -406,8 +405,7 @@ export function DemandsDashboard() {
     event: FormEvent<HTMLFormElement>,
     participantes: string[],
     duracaoPrevista: string,
-    nextStatus: DemandStatus,
-    confirmarConflito: boolean
+    nextStatus: DemandStatus
   ): Promise<ScheduleConflictDto[] | void> => {
     event.preventDefault()
 
@@ -498,7 +496,6 @@ export function DemandsDashboard() {
           participantes,
           version: currentDemand.version,
           status: nextStatus,
-          confirmarConflito,
         })
 
         const updatedDemand = response.data.demand
@@ -539,7 +536,7 @@ export function DemandsDashboard() {
 
       setEditingDemand(null)
     } catch (error) {
-      // Agenda ocupada: mantém o que a pessoa digitou e deixa confirmar no próprio modal.
+      // Agenda ocupada: mantém o que a pessoa digitou e mostra o problema no próprio modal.
       const conflicts = scheduleConflictsFromError(error)
       if (conflicts) {
         return conflicts
