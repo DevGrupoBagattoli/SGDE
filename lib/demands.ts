@@ -147,13 +147,7 @@ export type ScheduleConflictDto = {
   restrito: boolean
 }
 
-/**
- * Quem em `userIds` já está ocupado em [start, end) por outro chamado.
- *
- * Intervalos semiabertos: terminar às 10:00 e começar às 10:00 não conflita.
- * Só PENDING e IN_PROGRESS ocupam; IN_PROGRESS continua ocupando mesmo depois
- * do `fimPrevisto`, porque esse campo não muda sozinho (sem tratamento especial).
- */
+/** Quem em `userIds` já está ocupado em [start, end) por outro chamado PENDING ou IN_PROGRESS. */
 export const findScheduleConflicts = ({
   start,
   end,
