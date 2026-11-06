@@ -121,6 +121,13 @@ function ScheduleEditModalForm({
         : []
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    // Reativar só pelo status não passa pela rota de agenda: a tela barra aqui.
+    if (precheckConflicts.length > 0) {
+      event.preventDefault()
+      setSaveConflicts({ signature, conflicts: precheckConflicts })
+      return
+    }
+
     const refused = await onSubmit(event, participantes, duracaoPreview, statusValue)
 
     if (refused && refused.length > 0) {

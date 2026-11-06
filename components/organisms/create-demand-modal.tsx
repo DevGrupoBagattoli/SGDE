@@ -97,6 +97,11 @@ export function CreateDemandModal({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    if (precheckConflicts.length > 0) {
+      setSaveConflicts({ signature, conflicts: precheckConflicts })
+      return
+    }
+
     const refused = await onCreate({
       tecnico,
       equipe: "Sem equipe",
