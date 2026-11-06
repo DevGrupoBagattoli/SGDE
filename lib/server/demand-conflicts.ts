@@ -24,17 +24,27 @@ export const isActiveDemandStatus = (status: DemandStatus) =>
 type ConflictQuery = {
   start: Date
   end: Date
-  userIds: string[]
   excludeDemandId?: string
-}
+} & ({ userIds: string[]; userNames?: never } | { userNames: string[]; userIds?: never })
 
-export const detectScheduleConflicts = async (
-  viewer: User,
-  { start, end, userIds, excludeDemandId }: ConflictQuery
-) => {
-  if (userIds.length === 0) {
+export const detectScheduleConflicts = async (viewer: User, query: ConflictQuery) => {
+  const { start, end, excludeDemandId } = query
+  const userNames = query.userNames
+  const subjects = userNames ?? query.userIds
+
+  if (subjects.length === 0) {
     return { conflicts: [] as ScheduleConflict[], visible: [] as ScheduleConflictDto[] }
   }
+
+  const involvesSubjects = userNames
+    ? [
+        { technician: { name: { in: userNames } } },
+        { participants: { some: { user: { name: { in: userNames } } } } },
+      ]
+    : [
+        { technicianId: { in: subjects } },
+        { participants: { some: { userId: { in: subjects } } } },
+      ]
 
   const rows = await prisma.demand.findMany({
     where: {
@@ -43,14 +53,18 @@ export const detectScheduleConflicts = async (
       ...(excludeDemandId ? { id: { not: excludeDemandId } } : {}),
       inicioPrevisto: { lt: end },
       fimPrevisto: { gt: start },
-      OR: [
-        { technicianId: { in: userIds } },
-        { participants: { some: { userId: { in: userIds } } } },
-      ],
+      OR: involvesSubjects,
     },
-    include: {
-      technician: true,
-      participants: { include: { user: true } },
+    select: {
+      id: true,
+      local: true,
+      status: true,
+      deletedAt: true,
+      inicioPrevisto: true,
+      fimPrevisto: true,
+      technicianId: true,
+      technician: { select: { id: true, name: true } },
+      participants: { select: { userId: true, user: { select: { id: true, name: true } } } },
     },
   })
 
@@ -66,6 +80,15 @@ export const detectScheduleConflicts = async (
       ...row.participants.map((p) => ({ userId: p.user.id, userName: p.user.name })),
     ],
   }))
+
+  const wantedNames = new Set(userNames)
+  const userIds = userNames
+    ? candidates.flatMap((candidate) =>
+        candidate.people
+          .filter((person) => wantedNames.has(person.userName))
+          .map((person) => person.userId)
+      )
+    : subjects
 
   const conflicts = findScheduleConflicts({ start, end, userIds, excludeDemandId, candidates })
   const viewable = new Set(rows.filter((row) => canViewDemand(viewer, row)).map((row) => row.id))
@@ -103,10 +126,6 @@ const describeConflict = (conflict: ScheduleConflictDto) =>
 export const conflictMessage = (conflicts: ScheduleConflictDto[]) =>
   `Este horário está ocupado por uma atividade já marcada: ${conflicts.map(describeConflict).join("; ")}.`
 
-/**
- * Usada ao criar e remanejar: o chamado é salvo normalmente e, se alguém já
- * estava ocupado no horário, a resposta leva este aviso. `null` quando está livre.
- */
 export const scheduleConflictWarning = async (
   viewer: User,
   query: ConflictQuery

@@ -387,6 +387,34 @@ describe("GET /api/demands/conflicts", () => {
     expect(body.data.conflitos).toEqual([])
   })
 
+  it("resolve os nomes numa só consulta, sem buscar usuários antes", async () => {
+    db.demand.findMany.mockResolvedValue([existing()])
+
+    await get(query)
+
+    expect(db.user.findMany).not.toHaveBeenCalled()
+    expect(db.demand.findMany).toHaveBeenCalledTimes(1)
+    expect(db.demand.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { technician: { name: { in: [JOAO.name] } } },
+            { participants: { some: { user: { name: { in: [JOAO.name] } } } } },
+          ],
+        }),
+      })
+    )
+  })
+
+  it("não carrega a linha inteira de usuário (sem passwordHash)", async () => {
+    await get(query)
+
+    const args = db.demand.findMany.mock.calls[0][0] as { include?: unknown; select?: unknown }
+
+    expect(args.include).toBeUndefined()
+    expect(JSON.stringify(args.select)).not.toContain("passwordHash")
+  })
+
   it("passa excluir como chamado ignorado", async () => {
     await get({ ...query, excluir: "d-1" })
 

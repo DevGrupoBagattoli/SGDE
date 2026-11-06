@@ -4,7 +4,6 @@ import { requireAuth } from "@/lib/server/auth"
 import { detectScheduleConflicts } from "@/lib/server/demand-conflicts"
 import { parseDurationMinutes } from "@/lib/server/dates"
 import { jsonOk, jsonValidationError } from "@/lib/server/http"
-import { prisma } from "@/lib/server/prisma"
 
 const MAX_USERS = 50
 
@@ -55,15 +54,10 @@ export async function GET(request: Request) {
   const start = new Date(parsed.data.inicio)
   const end = new Date(start.getTime() + durationMinutes * 60_000)
 
-  // nomes são únicos; os que não existirem simplesmente não entram na checagem
-  const users = await prisma.user.findMany({
-    where: { name: { in: parsed.data.usuarios } },
-  })
-
   const { visible } = await detectScheduleConflicts(auth.user, {
     start,
     end,
-    userIds: users.map((found) => found.id),
+    userNames: parsed.data.usuarios,
     excludeDemandId: parsed.data.excluir,
   })
 
