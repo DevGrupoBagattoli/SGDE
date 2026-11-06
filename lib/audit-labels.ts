@@ -10,6 +10,7 @@ export const auditActionLabels: Record<string, string> = {
   DELETE: "Exclusão",
   ADD_PARTICIPANT: "Adição de participante",
   REMOVE_PARTICIPANT: "Remoção de participante",
+  CONFIRM_CONFLICT: "Confirmação de conflito de agenda",
 }
 
 /** Rótulos de campo alterado (chave = `field` no banco). */
@@ -21,6 +22,7 @@ export const auditFieldLabels: Record<string, string> = {
   descricao: "Descrição",
   participantes: "Participantes",
   participant: "Participante",
+  conflito: "Conflito de agenda",
   "*": "Geral",
 }
 
