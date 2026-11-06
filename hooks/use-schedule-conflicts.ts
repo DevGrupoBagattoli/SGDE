@@ -9,7 +9,6 @@ const DEBOUNCE_MS = 400
 const SEPARATOR = "\u0000"
 
 type UseScheduleConflictsParams = {
-  /** Desligado quando falta dado, o chamado não ocupa ninguém ou nada relevante mudou. */
   enabled: boolean
   inicio: string
   duracao: string
@@ -17,11 +16,6 @@ type UseScheduleConflictsParams = {
   excluir?: string
 }
 
-/**
- * Avisa antes de salvar quem já está ocupado no horário. Espera o usuário parar de
- * mexer (debounce) e descarta respostas de consultas que já ficaram para trás.
- * Falha de rede não bloqueia nada: o 409 do salvamento é a garantia.
- */
 export function useScheduleConflicts({
   enabled,
   inicio,
@@ -42,24 +36,27 @@ export function useScheduleConflicts({
   useEffect(() => {
     if (!key) return
 
-    let cancelled = false
+    const controller = new AbortController()
     const timer = setTimeout(() => {
-      apiGetConflicts({
-        inicio,
-        duracao,
-        usuarios: usuariosKey.split(SEPARATOR),
-        excluir,
-      })
+      apiGetConflicts(
+        {
+          inicio,
+          duracao,
+          usuarios: usuariosKey.split(SEPARATOR),
+          excluir,
+        },
+        controller.signal
+      )
         .then((conflicts) => {
-          if (!cancelled) setResult({ key, conflicts })
+          if (!controller.signal.aborted) setResult({ key, conflicts })
         })
         .catch(() => {
-          if (!cancelled) setResult({ key, conflicts: [] })
+          if (!controller.signal.aborted) setResult({ key, conflicts: [] })
         })
     }, DEBOUNCE_MS)
 
     return () => {
-      cancelled = true
+      controller.abort()
       clearTimeout(timer)
     }
   }, [key, inicio, duracao, usuariosKey, excluir])

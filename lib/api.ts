@@ -180,18 +180,22 @@ export const apiUpdateSchedule = async (
 }
 
 /** Aviso antecipado: quem já está ocupado em [inicio, inicio + duracao). */
-export const apiGetConflicts = async (params: {
-  inicio: string
-  duracao: string
-  usuarios: string[]
-  excluir?: string
-}) => {
+export const apiGetConflicts = async (
+  params: {
+    inicio: string
+    duracao: string
+    usuarios: string[]
+    excluir?: string
+  },
+  signal?: AbortSignal
+) => {
   const query = new URLSearchParams({ inicio: params.inicio, duracao: params.duracao })
   params.usuarios.forEach((name) => query.append("usuarios", name))
   if (params.excluir) query.set("excluir", params.excluir)
 
   const result = await request<{ conflitos: ScheduleConflictDto[] }>(
-    `/api/demands/conflicts?${query.toString()}`
+    `/api/demands/conflicts?${query.toString()}`,
+    { signal }
   )
 
   return result.data.conflitos
