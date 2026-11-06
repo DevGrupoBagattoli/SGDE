@@ -264,7 +264,11 @@ export function CreateDemandModal({
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSaving}>
+          <Button
+            className={conflicts.length > 0 ? "bg-red-600 text-white hover:bg-red-700" : undefined}
+            type="submit"
+            disabled={isSaving}
+          >
             {isSaving ? "Criando…" : conflicts.length > 0 ? "Criar mesmo assim" : "Criar chamado"}
           </Button>
         </div>
