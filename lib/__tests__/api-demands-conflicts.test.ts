@@ -553,6 +553,26 @@ describe("GET /api/demands/conflicts", () => {
     ])
   })
 
+  it("lista uma só vez a pessoa ocupada em vários chamados que o eletricista não vê", async () => {
+    login(JOAO)
+    const outroChamado = (id: string) =>
+      existing({
+        id,
+        technicianId: PEDRO.id,
+        technician: PEDRO,
+        participants: [{ userId: MARIA.id, user: MARIA }],
+      })
+    db.demand.findMany.mockResolvedValue([outroChamado("d-a"), outroChamado("d-b")])
+
+    const response = await get({ ...query, usuarios: MARIA.name })
+    const body = (await response.json()) as { data: { conflitos: Array<Record<string, unknown>> } }
+
+    expect(body.data.conflitos).toHaveLength(1)
+    expect(body.data.conflitos[0]).toEqual(
+      expect.objectContaining({ userName: MARIA.name, restrito: true })
+    )
+  })
+
   it("mostra detalhes ao eletricista quando o chamado é dele", async () => {
     login(JOAO)
     db.demand.findMany.mockResolvedValue([existing()])

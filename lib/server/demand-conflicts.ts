@@ -93,7 +93,7 @@ export const detectScheduleConflicts = async (viewer: User, query: ConflictQuery
   const conflicts = findScheduleConflicts({ start, end, userIds, excludeDemandId, candidates })
   const viewable = new Set(rows.filter((row) => canViewDemand(viewer, row)).map((row) => row.id))
 
-  const visible = conflicts.map((conflict): ScheduleConflictDto =>
+  const toDto = (conflict: ScheduleConflict): ScheduleConflictDto =>
     viewable.has(conflict.demandId)
       ? {
           userId: conflict.userId,
@@ -113,7 +113,15 @@ export const detectScheduleConflicts = async (viewer: User, query: ConflictQuery
           fim: null,
           restrito: true,
         }
-  )
+
+  const restrictedUserIds = new Set<string>()
+  const visible = conflicts.map(toDto).filter((conflict) => {
+    if (!conflict.restrito) return true
+    if (restrictedUserIds.has(conflict.userId)) return false
+
+    restrictedUserIds.add(conflict.userId)
+    return true
+  })
 
   return { conflicts, visible }
 }
