@@ -4,8 +4,18 @@ import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
-import { toDemandDto, updateScheduleSchema, parseScheduleUpdateData } from "@/lib/server/demands"
-import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
+import {
+  isActiveDemandStatus,
+  resolveScheduleConflicts,
+  SCHEDULE_CONFLICT_REASON,
+} from "@/lib/server/demand-conflicts"
+import {
+  demandStatusToDb,
+  parseScheduleUpdateData,
+  toDemandDto,
+  updateScheduleSchema,
+} from "@/lib/server/demands"
+import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 type RouteParams = {
@@ -103,30 +113,42 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     },
   })
 
-  const overlapCount = await prisma.demand.count({
-    where: {
-      id: {
-        not: demand.id,
-      },
-      technicianId: demand.technicianId,
-      inicioPrevisto: {
-        lte: parsedDate.end,
-      },
-      fimPrevisto: {
-        gte: parsedDate.start,
-      },
-    },
-  })
+  // Status que o chamado terá ao salvar (a troca em si é feita pela rota de status).
+  const effectiveStatus = parsed.data.status
+    ? demandStatusToDb(parsed.data.status)
+    : demand.status
+  const currentParticipantIds = new Set(demand.participants.map((p) => p.userId))
+  const addsPeople = participants.some((p) => !currentParticipantIds.has(p.id))
+  const reactivates =
+    !isActiveDemandStatus(demand.status) && isActiveDemandStatus(effectiveStatus)
 
-  const warnings: ApiWarning[] =
-    overlapCount > 0
-      ? [
-          {
-            code: "SCHEDULE_CONFLICT",
-            message: "Existe possível conflito de agenda para o técnico responsável.",
-          },
-        ]
-      : []
+  // Só checa quando algo que afeta a ocupação muda; senão editar uma observação
+  // exigiria confirmar de novo um conflito que já existia.
+  let conflictAuditSummary: string | null = null
+
+  if (
+    isActiveDemandStatus(effectiveStatus) &&
+    (parsedDate.moved || addsPeople || reactivates)
+  ) {
+    const resolution = await resolveScheduleConflicts(auth.user, {
+      start: parsedDate.start,
+      end: parsedDate.end,
+      userIds: [demand.technicianId, ...participants.map((p) => p.id)],
+      excludeDemandId: demand.id,
+      confirmar: parsed.data.confirmarConflito,
+    })
+
+    if (resolution.status === "needs-confirmation") {
+      return jsonError(409, "CONFLICT", resolution.message, {
+        reason: SCHEDULE_CONFLICT_REASON,
+        conflitos: resolution.visible,
+      })
+    }
+
+    if (resolution.status === "confirmed") {
+      conflictAuditSummary = resolution.auditSummary
+    }
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.demandParticipant.deleteMany({
@@ -189,6 +211,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           nextValue: participants.map((p) => p.name).join(", "),
           reason: parsed.data.observacoes.trim() || null,
         },
+        ...(conflictAuditSummary
+          ? [
+              {
+                demandId: demand.id,
+                actorUserId: auth.user.id,
+                action: "CONFIRM_CONFLICT",
+                field: "conflito",
+                previousValue: null,
+                nextValue: conflictAuditSummary,
+                reason: parsed.data.observacoes.trim() || null,
+              },
+            ]
+          : []),
       ],
     })
 
@@ -210,7 +245,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         ...dto,
         dateKeys: enumerateDateKeysInAppTz(updated.inicioPrevisto, updated.fimPrevisto),
       },
-    },
-    warnings
+    }
   )
 }
