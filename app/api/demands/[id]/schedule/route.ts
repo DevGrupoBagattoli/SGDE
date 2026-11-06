@@ -119,13 +119,20 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
   const shouldCheckConflicts =
     isActiveDemandStatus(effectiveStatus) && (parsedDate.moved || addsPeople || reactivates)
+  const newParticipantIds = participants
+    .filter((p) => !currentParticipantIds.has(p.id))
+    .map((p) => p.id)
+  const peopleToCheck =
+    parsedDate.moved || reactivates
+      ? [demand.technicianId, ...participants.map((p) => p.id)]
+      : newParticipantIds
   const warnings: ApiWarning[] = []
 
   if (shouldCheckConflicts) {
     const warning = await scheduleConflictWarning(auth.user, {
       start: parsedDate.start,
       end: parsedDate.end,
-      userIds: [demand.technicianId, ...participants.map((p) => p.id)],
+      userIds: peopleToCheck,
       excludeDemandId: demand.id,
     })
 

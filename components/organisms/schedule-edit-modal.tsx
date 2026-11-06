@@ -94,11 +94,15 @@ function ScheduleEditModalForm({
 
   const shouldCheckConflicts =
     isActiveStatus(statusValue) && (startChanged || durationChanged || addsPeople || reactivates)
+  const peopleToCheck =
+    startChanged || durationChanged || reactivates
+      ? [demand.tecnico, ...participantes]
+      : participantes.filter((name) => !demand.participantes.includes(name))
   const { conflicts } = useScheduleConflicts({
     enabled: shouldCheckConflicts,
     inicio: inicioIso,
     duracao: duracaoPreview,
-    usuarios: [demand.tecnico, ...participantes],
+    usuarios: peopleToCheck,
     excluir: demand.id,
   })
 
