@@ -113,6 +113,76 @@ export const predictedEndDate = (demand: Demand): Date => {
   return new Date(start.getTime() + 60 * 60_000)
 }
 
+/** Chamado já gravado que pode ocupar alguém (técnico + participantes em `people`). */
+export type ConflictCandidate = {
+  id: string
+  local: string
+  status: "PENDING" | "IN_PROGRESS" | "DONE" | "CANCELLED"
+  deletedAt: Date | null
+  inicioPrevisto: Date
+  fimPrevisto: Date
+  people: Array<{ userId: string; userName: string }>
+}
+
+export type ScheduleConflict = {
+  userId: string
+  userName: string
+  demandId: string
+  local: string
+  inicio: Date
+  fim: Date
+}
+
+/**
+ * Quem em `userIds` já está ocupado em [start, end) por outro chamado.
+ *
+ * Intervalos semiabertos: terminar às 10:00 e começar às 10:00 não conflita.
+ * Só PENDING e IN_PROGRESS ocupam; IN_PROGRESS continua ocupando mesmo depois
+ * do `fimPrevisto`, porque esse campo não muda sozinho (sem tratamento especial).
+ */
+export const findScheduleConflicts = ({
+  start,
+  end,
+  userIds,
+  excludeDemandId,
+  candidates,
+}: {
+  start: Date
+  end: Date
+  userIds: string[]
+  excludeDemandId?: string
+  candidates: ConflictCandidate[]
+}): ScheduleConflict[] => {
+  const wanted = new Set(userIds)
+  const conflicts: ScheduleConflict[] = []
+
+  for (const candidate of candidates) {
+    if (candidate.id === excludeDemandId || candidate.deletedAt) continue
+    if (candidate.status !== "PENDING" && candidate.status !== "IN_PROGRESS") continue
+    if (!(candidate.inicioPrevisto < end && candidate.fimPrevisto > start)) continue
+
+    const seen = new Set<string>()
+    for (const person of candidate.people) {
+      if (!wanted.has(person.userId) || seen.has(person.userId)) continue
+      seen.add(person.userId)
+      conflicts.push({
+        userId: person.userId,
+        userName: person.userName,
+        demandId: candidate.id,
+        local: candidate.local,
+        inicio: candidate.inicioPrevisto,
+        fim: candidate.fimPrevisto,
+      })
+    }
+  }
+
+  return conflicts.sort(
+    (a, b) =>
+      a.inicio.getTime() - b.inicio.getTime() ||
+      a.userName.localeCompare(b.userName, "pt-BR")
+  )
+}
+
 export const mockDemands: Demand[] = [
   {
     id: "1",
