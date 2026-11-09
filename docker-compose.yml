@@ -54,6 +54,7 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
     container_name: sgde-app
     restart: unless-stopped
     environment:

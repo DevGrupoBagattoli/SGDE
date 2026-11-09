@@ -23,5 +23,11 @@ const nextConfig = {
   },
 }
 
-// Sem SENTRY_AUTH_TOKEN o upload de source maps é pulado (só avisa no build).
-export default withSentryConfig(nextConfig, { silent: true })
+// Source maps sobem no build quando SENTRY_AUTH_TOKEN existe (lido do ambiente);
+// sem o token o upload é pulado e o build segue normal. Os .map são apagados
+// depois do upload, então não ficam públicos no deploy.
+export default withSentryConfig(nextConfig, {
+  org: "bagattoli-tech",
+  project: "sgde",
+  silent: true,
+})
