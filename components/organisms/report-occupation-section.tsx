@@ -85,7 +85,7 @@ function OccupationGrid({
         <p className="rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-900">
           Dia mais carregado:{" "}
           <strong>{formatReportDayLabel(busiestDay.key)}</strong> com{" "}
-          {busiestDay.total} demanda{busiestDay.total === 1 ? "" : "s"} na equipe.
+          {`${busiestDay.total} demanda${busiestDay.total === 1 ? "" : "s"} na equipe.`}
         </p>
       ) : null}
 

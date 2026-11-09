@@ -62,8 +62,8 @@ export function ReportTablePagination({
           </>
         ) : (
           <>
-            <span className="font-medium text-slate-700">{total}</span> registro
-            {total === 1 ? "" : "s"}
+            <span className="font-medium text-slate-700">{total}</span>
+            {` registro${total === 1 ? "" : "s"}`}
           </>
         )}
       </p>
