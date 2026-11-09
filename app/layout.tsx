@@ -15,6 +15,8 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
+  // Tradução automática do Chrome troca textos por <font> e quebra o React (removeChild).
+  other: { google: "notranslate" },
 }
 
 /** Evita zoom automático no iOS ao focar inputs (e pinch-zoom), priorizando uso em celular. */
@@ -33,7 +35,8 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="pt-BR"
+      translate="no"
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", outfit.variable)}
     >
