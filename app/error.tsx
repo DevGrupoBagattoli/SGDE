@@ -26,7 +26,7 @@ export default function ErrorPage({
       <p className="text-muted-foreground max-w-md text-sm">
         Ocorreu um erro inesperado. Tente novamente; se continuar, envie um print desta tela ao suporte.
       </p>
-      <pre className="bg-muted max-w-full overflow-auto rounded-md p-3 text-left text-xs">
+      <pre className="bg-muted w-full max-w-md rounded-md p-3 text-left text-xs break-words whitespace-pre-wrap">
         {error.name}: {error.message}
         {error.digest ? `\ndigest: ${error.digest}` : ""}
       </pre>
