@@ -5,13 +5,14 @@ import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canViewDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
+import { isActiveDemandStatus, scheduleConflictWarning } from "@/lib/server/demand-conflicts"
 import {
   createDemandSchema,
   demandsWhereForUser,
   parseCreateDemandData,
   toDemandDto,
 } from "@/lib/server/demands"
-import { jsonError, jsonOk, jsonValidationError } from "@/lib/server/http"
+import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
 const querySchema = z.object({
@@ -182,6 +183,21 @@ export async function POST(request: Request) {
     })
   }
 
+  const shouldCheckConflicts = isActiveDemandStatus(parsedDate.dbStatus)
+  const warnings: ApiWarning[] = []
+
+  if (shouldCheckConflicts) {
+    const warning = await scheduleConflictWarning(auth.user, {
+      start: parsedDate.start,
+      end: parsedDate.end,
+      userIds: [technician.id, ...participants.map((participant) => participant.id)],
+    })
+
+    if (warning) {
+      warnings.push(warning)
+    }
+  }
+
   const created = await prisma.demand.create({
     data: {
       technicianId: technician.id,
@@ -237,6 +253,6 @@ export async function POST(request: Request) {
         dateKeys: enumerateDateKeysInAppTz(created.inicioPrevisto, created.fimPrevisto),
       },
     },
-    []
+    warnings
   )
 }

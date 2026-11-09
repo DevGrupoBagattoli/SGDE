@@ -487,6 +487,7 @@ export function DemandsDashboard() {
           observacoes: trimmedObservacoes,
           participantes,
           version: currentDemand.version,
+          status: nextStatus,
         })
 
         const updatedDemand = response.data.demand

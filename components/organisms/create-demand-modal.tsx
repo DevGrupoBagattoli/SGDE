@@ -3,7 +3,9 @@
 import { FormEvent, useMemo, useState } from "react"
 import { X } from "lucide-react"
 
+import { ScheduleConflictAlert } from "@/components/molecules/schedule-conflict-alert"
 import { Button } from "@/components/ui/button"
+import { useScheduleConflicts } from "@/hooks/use-schedule-conflicts"
 import { UserSession } from "@/lib/auth"
 import { fromDateTimeLocalValue } from "@/lib/calendar"
 import {
@@ -56,6 +58,22 @@ export function CreateDemandModal({
 
   const isTechnicianLocked = session.role === "eletricista"
   const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
+
+  const inicioIso = useMemo(() => {
+    try {
+      return fromDateTimeLocalValue(horarioInicio)
+    } catch {
+      return ""
+    }
+  }, [horarioInicio])
+
+  const occupiesSchedule = status === "Pendente" || status === "Em Andamento"
+  const { conflicts } = useScheduleConflicts({
+    enabled: occupiesSchedule,
+    inicio: inicioIso,
+    duracao: duracaoPreview,
+    usuarios: tecnico ? [tecnico] : [],
+  })
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -236,12 +254,22 @@ export function CreateDemandModal({
           </label>
         </div>
 
+        {conflicts.length > 0 ? (
+          <div className="mt-4">
+            <ScheduleConflictAlert conflicts={conflicts} />
+          </div>
+        ) : null}
+
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Criando…" : "Criar chamado"}
+          <Button
+            className={conflicts.length > 0 ? "bg-red-600 text-white hover:bg-red-700" : undefined}
+            type="submit"
+            disabled={isSaving}
+          >
+            {isSaving ? "Criando…" : conflicts.length > 0 ? "Criar mesmo assim" : "Criar chamado"}
           </Button>
         </div>
       </form>

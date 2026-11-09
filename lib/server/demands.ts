@@ -71,6 +71,8 @@ export const updateScheduleSchema = z.object({
   observacoes: z.string().default(""),
   participantes: z.array(z.string()).default([]),
   version: z.number().int().positive(),
+  /** Status que o chamado terá ao salvar (a troca é feita pela rota de status); só decide se a agenda é checada. */
+  status: z.enum(["Pendente", "Em Andamento", "Concluído", "Cancelado"]).optional(),
 })
 
 export const parseCreateDemandData = (input: z.infer<typeof createDemandSchema>) => {

@@ -1,9 +1,12 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useMemo, useState } from "react"
 import { UserPlus, X } from "lucide-react"
 
+import { ScheduleConflictAlert } from "@/components/molecules/schedule-conflict-alert"
 import { Button } from "@/components/ui/button"
+import { useScheduleConflicts } from "@/hooks/use-schedule-conflicts"
+import { fromDateTimeLocalValue } from "@/lib/calendar"
 import {
   Demand,
   DemandStatus,
@@ -33,6 +36,9 @@ type ScheduleEditModalProps = {
     status: DemandStatus
   ) => Promise<void> | void
 }
+
+const isActiveStatus = (status: DemandStatus) =>
+  status === "Pendente" || status === "Em Andamento"
 
 const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.floor(Number.isFinite(n) ? n : 0)))
@@ -72,6 +78,33 @@ function ScheduleEditModalForm({
   const [statusValue, setStatusValue] = useState<DemandStatus>(demand.status)
 
   const duracaoPreview = formatDuracaoFromParts(durHours, durMinutes)
+
+  const inicioIso = useMemo(() => {
+    try {
+      return fromDateTimeLocalValue(scheduleValue)
+    } catch {
+      return ""
+    }
+  }, [scheduleValue])
+
+  const startChanged = inicioIso.slice(0, 16) !== demand.horarioInicio.slice(0, 16)
+  const durationChanged = duracaoPreview !== demand.duracaoPrevista
+  const addsPeople = participantes.some((name) => !demand.participantes.includes(name))
+  const reactivates = !isActiveStatus(demand.status) && isActiveStatus(statusValue)
+
+  const shouldCheckConflicts =
+    isActiveStatus(statusValue) && (startChanged || durationChanged || addsPeople || reactivates)
+  const peopleToCheck =
+    startChanged || durationChanged || reactivates
+      ? [demand.tecnico, ...participantes]
+      : participantes.filter((name) => !demand.participantes.includes(name))
+  const { conflicts } = useScheduleConflicts({
+    enabled: shouldCheckConflicts,
+    inicio: inicioIso,
+    duracao: duracaoPreview,
+    usuarios: peopleToCheck,
+    excluir: demand.id,
+  })
 
   const available = allTechnicians.filter(
     (t) => t !== demand.tecnico && !participantes.includes(t)
@@ -229,6 +262,10 @@ function ScheduleEditModalForm({
               onChange={(event) => onObservationChange(event.target.value)}
             />
           </label>
+
+          {conflicts.length > 0 ? (
+            <ScheduleConflictAlert conflicts={conflicts} />
+          ) : null}
 
           {error ? (
             <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
