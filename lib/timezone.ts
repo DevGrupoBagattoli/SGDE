@@ -35,8 +35,52 @@ export const APP_TIME_ZONE = resolveAppTimeZone()
 
 const pad = (value: number) => String(value).padStart(2, "0")
 
-const PARTS_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  timeZone: APP_TIME_ZONE,
+/**
+ * Deslocamento fixo usado SÓ quando o navegador não sabe resolver o fuso pelo
+ * Intl (WebView antigo com ICU reduzido não conhece "America/Porto_Velho" e
+ * lança RangeError). Vilhena/RO é UTC-4 o ano todo (sem horário de verão).
+ */
+const FALLBACK_OFFSET_MS = -4 * 60 * 60 * 1000
+
+/** Cria o formatter no fuso da empresa; null (nunca lança) se o navegador não suportar. */
+const tryZonedFormatter = (
+  locale: string,
+  options: Intl.DateTimeFormatOptions
+): Intl.DateTimeFormat | null => {
+  try {
+    return new Intl.DateTimeFormat(locale, { ...options, timeZone: APP_TIME_ZONE })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Formatter de instantes no fuso da empresa que nunca derruba a tela: se o
+ * navegador não suportar o fuso, desloca o instante pelo UTC-4 fixo e formata
+ * como UTC (suportado por todo Intl).
+ */
+export const createAppFormatter = (
+  locale: string,
+  options: Intl.DateTimeFormatOptions
+): { format: (date: Date) => string } => {
+  const zoned = tryZonedFormatter(locale, options)
+  if (zoned) return zoned
+
+  let shifted: Intl.DateTimeFormat | null = null
+  try {
+    shifted = new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" })
+  } catch {
+    shifted = null
+  }
+  return {
+    format: (date) =>
+      shifted
+        ? shifted.format(new Date(date.getTime() + FALLBACK_OFFSET_MS))
+        : formatAppDateTime(date),
+  }
+}
+
+const PARTS_FORMATTER = tryZonedFormatter("en-US", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
@@ -57,6 +101,17 @@ export type ZonedParts = {
 
 /** Componentes de data/hora do instante no fuso da empresa. */
 export const getZonedParts = (date: Date): ZonedParts => {
+  if (!PARTS_FORMATTER || typeof PARTS_FORMATTER.formatToParts !== "function") {
+    const shifted = new Date(date.getTime() + FALLBACK_OFFSET_MS)
+    return {
+      year: shifted.getUTCFullYear(),
+      month: shifted.getUTCMonth() + 1,
+      day: shifted.getUTCDate(),
+      hour: shifted.getUTCHours(),
+      minute: shifted.getUTCMinutes(),
+      second: shifted.getUTCSeconds(),
+    }
+  }
   const parts: Record<string, number> = {}
   for (const part of PARTS_FORMATTER.formatToParts(date)) {
     if (part.type !== "literal") parts[part.type] = Number(part.value)
@@ -175,17 +230,15 @@ export const todayCalendarDateInAppTz = (now = new Date()): Date => {
 export const calendarDateOfInstantInAppTz = (date: Date): Date =>
   todayCalendarDateInAppTz(date)
 
-export const appTimeFormatter = new Intl.DateTimeFormat("pt-BR", {
+export const appTimeFormatter = createAppFormatter("pt-BR", {
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: APP_TIME_ZONE,
 })
 
-export const appDateFormatter = new Intl.DateTimeFormat("pt-BR", {
+export const appDateFormatter = createAppFormatter("pt-BR", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
-  timeZone: APP_TIME_ZONE,
 })
 
 /** "dd/MM/yyyy HH:mm" no fuso da empresa. Formato único de data e hora (tela, CSV, auditoria). */

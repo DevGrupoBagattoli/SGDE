@@ -1,6 +1,6 @@
 import {
-  APP_TIME_ZONE,
   appTimeFormatter,
+  createAppFormatter,
   calendarDateOfInstantInAppTz,
   enumerateDateKeysInAppTz,
   fromAppDateTimeInputValue,
@@ -24,11 +24,10 @@ export const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
  */
 
 /** Formata o dia de um INSTANTE no fuso da empresa (ex.: "qua., 04/11"). */
-export const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
+export const dateFormatter = createAppFormatter("pt-BR", {
   weekday: "short",
   day: "2-digit",
   month: "2-digit",
-  timeZone: APP_TIME_ZONE,
 })
 
 /** Formata uma DATA DE CALENDÁRIO (meia-noite local). */
