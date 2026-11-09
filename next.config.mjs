@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { withSentryConfig } from "@sentry/nextjs/config"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -22,4 +23,5 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+// Sem SENTRY_AUTH_TOKEN o upload de source maps é pulado (só avisa no build).
+export default withSentryConfig(nextConfig, { silent: true })
