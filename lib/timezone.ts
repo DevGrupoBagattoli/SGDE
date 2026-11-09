@@ -246,3 +246,9 @@ export const formatAppDateTime = (date: Date): string => {
   const p = getZonedParts(date)
   return `${pad(p.day)}/${pad(p.month)}/${p.year} ${pad(p.hour)}:${pad(p.minute)}`
 }
+
+/** "11/05/2026 10:00 – 12:00", ou com as duas datas quando o intervalo cruza a meia-noite. */
+export const formatAppDateTimeRange = (start: Date, end: Date): string =>
+  dateKeyInAppTz(start) === dateKeyInAppTz(end)
+    ? `${formatAppDateTime(start)} – ${appTimeFormatter.format(end)}`
+    : `${formatAppDateTime(start)} – ${formatAppDateTime(end)}`

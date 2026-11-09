@@ -4,7 +4,13 @@ import { notifyDemandEvent } from "@/lib/notifications/demand-events"
 import { canEditDemand, requireAuth } from "@/lib/server/auth"
 import { validateCsrf } from "@/lib/server/csrf"
 import { enumerateDateKeysInAppTz } from "@/lib/timezone"
-import { toDemandDto, updateScheduleSchema, parseScheduleUpdateData } from "@/lib/server/demands"
+import { isActiveDemandStatus, scheduleConflictWarning } from "@/lib/server/demand-conflicts"
+import {
+  demandStatusToDb,
+  parseScheduleUpdateData,
+  toDemandDto,
+  updateScheduleSchema,
+} from "@/lib/server/demands"
 import { jsonError, jsonOk, jsonValidationError, type ApiWarning } from "@/lib/server/http"
 import { prisma } from "@/lib/server/prisma"
 
@@ -103,30 +109,37 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     },
   })
 
-  const overlapCount = await prisma.demand.count({
-    where: {
-      id: {
-        not: demand.id,
-      },
-      technicianId: demand.technicianId,
-      inicioPrevisto: {
-        lte: parsedDate.end,
-      },
-      fimPrevisto: {
-        gte: parsedDate.start,
-      },
-    },
-  })
+  const effectiveStatus = parsed.data.status
+    ? demandStatusToDb(parsed.data.status)
+    : demand.status
+  const currentParticipantIds = new Set(demand.participants.map((p) => p.userId))
+  const addsPeople = participants.some((p) => !currentParticipantIds.has(p.id))
+  const reactivates =
+    !isActiveDemandStatus(demand.status) && isActiveDemandStatus(effectiveStatus)
 
-  const warnings: ApiWarning[] =
-    overlapCount > 0
-      ? [
-          {
-            code: "SCHEDULE_CONFLICT",
-            message: "Existe possível conflito de agenda para o técnico responsável.",
-          },
-        ]
-      : []
+  const shouldCheckConflicts =
+    isActiveDemandStatus(effectiveStatus) && (parsedDate.moved || addsPeople || reactivates)
+  const newParticipantIds = participants
+    .filter((p) => !currentParticipantIds.has(p.id))
+    .map((p) => p.id)
+  const peopleToCheck =
+    parsedDate.moved || reactivates
+      ? [demand.technicianId, ...participants.map((p) => p.id)]
+      : newParticipantIds
+  const warnings: ApiWarning[] = []
+
+  if (shouldCheckConflicts) {
+    const warning = await scheduleConflictWarning(auth.user, {
+      start: parsedDate.start,
+      end: parsedDate.end,
+      userIds: peopleToCheck,
+      excludeDemandId: demand.id,
+    })
+
+    if (warning) {
+      warnings.push(warning)
+    }
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.demandParticipant.deleteMany({

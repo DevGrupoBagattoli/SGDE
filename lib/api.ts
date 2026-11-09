@@ -1,5 +1,5 @@
 import { UserSession } from "@/lib/auth"
-import { Demand, DemandStatus } from "@/lib/demands"
+import { Demand, DemandStatus, type ScheduleConflictDto } from "@/lib/demands"
 import type { NotificationEventType } from "@/lib/notifications/types"
 import type {
   ReportAuditRow,
@@ -167,6 +167,8 @@ export const apiUpdateSchedule = async (
     observacoes: string
     participantes: string[]
     version: number
+    /** Status que o chamado terá ao salvar; o servidor só usa para decidir se checa a agenda. */
+    status?: DemandStatus
   }
 ) => {
   const result = await request<{ demand: Demand }>(`/api/demands/${id}/schedule`, {
@@ -175,6 +177,28 @@ export const apiUpdateSchedule = async (
   })
 
   return result
+}
+
+/** Aviso antecipado: quem já está ocupado em [inicio, inicio + duracao). */
+export const apiGetConflicts = async (
+  params: {
+    inicio: string
+    duracao: string
+    usuarios: string[]
+    excluir?: string
+  },
+  signal?: AbortSignal
+) => {
+  const query = new URLSearchParams({ inicio: params.inicio, duracao: params.duracao })
+  params.usuarios.forEach((name) => query.append("usuarios", name))
+  if (params.excluir) query.set("excluir", params.excluir)
+
+  const result = await request<{ conflitos: ScheduleConflictDto[] }>(
+    `/api/demands/conflicts?${query.toString()}`,
+    { signal }
+  )
+
+  return result.data.conflitos
 }
 
 export type UserDto = {

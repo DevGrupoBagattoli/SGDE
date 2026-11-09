@@ -245,7 +245,9 @@ Eletricista:
 - demanda com intervalo explicito: inicioPrevisto e fimPrevisto
 - suporte a multi-dia (a mesma demanda aparece em todos os dias cobertos)
 - remanejamento exige observacao
-- conflito de agenda retorna warning nao bloqueante
+- conflito de agenda e checado por pessoa (tecnico + participantes) em chamados PENDING e IN_PROGRESS; intervalos sao semiabertos (terminar as 10:00 e comecar as 10:00 nao conflita)
+- ao criar ou remanejar com conflito, a API salva normalmente e devolve o warning SCHEDULE_CONFLICT (nao bloqueante) listando quem esta ocupado
+- GET /api/demands/conflicts?inicio&duracao&usuarios&excluir antecipa o aviso para os formularios
 - concorrencia otimista por version
 - auditoria para criacao, status e agenda
 
