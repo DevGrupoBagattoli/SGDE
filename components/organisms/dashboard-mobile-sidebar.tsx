@@ -128,7 +128,7 @@ export function DashboardMobileSidebar({
                 <div className="mt-1 flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700">
                   <CalendarDays className="size-4 shrink-0 text-blue-600" />
                   <span>
-                    {totalDemands} demanda{totalDemands === 1 ? "" : "s"}
+                    {`${totalDemands} demanda${totalDemands === 1 ? "" : "s"}`}
                   </span>
                 </div>
               ) : null}
