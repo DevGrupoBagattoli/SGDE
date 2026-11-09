@@ -52,11 +52,14 @@ services:
     build:
       context: .
       target: runner
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     container_name: sgde-app
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/sgde?schema=public}
     depends_on:
       db:
